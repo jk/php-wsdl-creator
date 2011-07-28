@@ -1,0 +1,79 @@
+<?php
+
+/*
+PhpWsdl - Generate WSDL from PHP
+Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+
+This program is free software; you can redistribute it and/or modify it under 
+the terms of the GNU General Public License as published by the Free Software 
+Foundation; either version 3 of the License, or (at your option) any later 
+version. 
+
+This program is distributed in the hope that it will be useful, but WITHOUT 
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS 
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. 
+
+You should have received a copy of the GNU General Public License along with 
+this program; if not, see <http://www.gnu.org/licenses/>.
+*/
+
+if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
+	exit;
+
+/**
+ * An element of a complex type
+ * 
+ * @author Andreas Zimmermann, wan24.de
+ */
+class PhpWsdlElement extends PhpWsdlParam{
+	/**
+	 * Can the value be NULL?
+	 * 
+	 * @var boolean
+	 */
+	public $NillAble=true;
+	/**
+	 * Minimum number of elements
+	 * 
+	 * @var int
+	 */
+	public $MinOccurs=1;
+	/**
+	 * Maximum number of elements
+	 * 
+	 * @var int
+	 */
+	public $MaxOccurs=1;
+	
+	/**
+	 * Constructor
+	 * 
+	 * @param string $name The name
+	 * @param string $type The type name
+	 * @param array $settings Optional the settings hash array (default: NULL)
+	 */
+	public function PhpWsdlElement($name,$type,$settings=null){
+		parent::PhpWsdlParam($name,$type);
+		if(!is_null($settings)){
+			if(isset($settings['nillable']))
+				$this->NillAble=$sttings['nillable']=='1'||$settings['nillable']=='true';
+			if(isset($settings['minoccurs']))
+				$this->MinOccurs=$settings['minoccurs'];
+			if(isset($settings['maxoccurs']))
+				$this->MaxOccurs=$settings['maxoccurs'];
+		}
+	}
+	
+	/**
+	 * Create the WSDL
+	 * 
+	 * @param PhpWsdl $pw The PhpWsdl object
+	 * @return string The WSDL
+	 */
+	public function CreateElement($pw){
+		$res="\t\t\t\t\t".'<s:element minOccurs="'.$this->MinOccurs.'" maxOccurs="'.$this->MaxOccurs.'" nillable="'.(($this->NillAble)?'true':'false').'" name="'.$this->Name.'" type="';
+		$res.=(in_array($this->Type,$pw->BasicTypes))?'s':'tns';
+		$res.=':'.$this->Type.'" />';
+		return $res;
+	}
+}

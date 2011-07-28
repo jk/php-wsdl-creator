@@ -1,0 +1,34 @@
+To install the demonstrations on your webserver, simply copy all files to a 
+folder that is accessable with a browser. To see the generated WSDL, you 
+don't need to do anything else.
+
+The caching feature also needs a writeable cache folder. Per default the demo 
+classes are using the subfolder "cache". Set the rights for this folder to 
+777. You really should use caching! Disabling the cache makes only sense in 
+some special cases. However, PhpWsdl will also work with caching disabled.
+
+To see the WSDL in your browser, the location should look like this:
+
+http://your-server.com/demo.php?WSDL&readable
+
+This location is also valid when adding a service or web reference in 
+Microsoft Visual Studio for example. Within the WSDL the real SOAP endpoint 
+(without "?WSDL") is defined. But for your project you should use the 
+optimized WSDL URI:
+
+http://your-server.com/demo.php?WSDL
+
+To see a human readable HTML interface description, simply use this location:
+
+http://your-server.com/demo.php
+
+All demos should produce equal and valid WSDL. If something doesn't work, 
+be sure that your PHP installation includes the PHP SoapServer class! To 
+determine this, you can use this PHP script:
+
+<?php phpInfo();
+
+The output should contain "Soap Server enabled" in the "soap" section. The 
+rest is done in standard PHP and shouldn't have any special requirements. I 
+developed and tested PhpWsdl with PHP 5.2.10 on a Debian lenny server. But 
+PhpWsdl may also work on a different OS and with older or newer PHP versions.
