@@ -36,7 +36,7 @@ require_once(dirname(__FILE__).'/class.phpwsdlproxy.php');
  * 
  * @author Andreas Zimmermann
  * @copyright ©2011 Andreas Zimmermann, wan24.de
- * @version 1.0
+ * @version 1.0.1
  */
 class PhpWsdl{
 	/**
@@ -258,7 +258,7 @@ class PhpWsdl{
 			$this->NameSpace=$nameSpace;
 		if(!is_null($name))
 			$this->Name=$name;
-		$this->EndPoint=((!is_null($endPoint)))?$endPoint:((isset($_SERVER['SSL']))?'https':'http').'://'.$_SERVER['SERVER_NAME'].$_SERVER['SCRIPT_NAME'];
+		$this->EndPoint=((!is_null($endPoint)))?$endPoint:((isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on')?'https':'http').'://'.$_SERVER['SERVER_NAME'].$_SERVER['SCRIPT_NAME'];
 		if(!is_null($file))
 			$this->Files=(is_array($file))?$file:Array($file);
 		$this->Methods=(!is_null($methods))?$methods:Array();
@@ -266,7 +266,7 @@ class PhpWsdl{
 		if($outputOnRequest&&!$runServer)
 			$this->OutputWsdlOnRequest();
 		if($runServer)
-			$this->RunServer(null,(is_boolean($runServer))?null:$runServer);
+			$this->RunServer(null,(is_bool($runServer))?null:$runServer);
 	}
 	
 	/**
@@ -605,8 +605,8 @@ class PhpWsdl{
 						}
 						$temp=Array(
 							'nillable=<span class="blue">'.(($e->NillAble)?'true':'false').'</span>',
-							'minoccours=<span class="blue">'.$e->MinOccurs.'</span>',
-							'maxoccours=<span class="blue">'.$e->MaxOccurs.'</span>',
+							'minoccurs=<span class="blue">'.$e->MinOccurs.'</span>',
+							'maxoccurs=<span class="blue">'.$e->MaxOccurs.'</span>',
 						);
 						$res[sizeof($res)-1].=' ('.implode(', ',$temp).')</li>';
 					}
