@@ -2,6 +2,7 @@ Contents
 ~~~~~~~~
 - Why another WSDL generator?
 - How to use PhpWsdl
+- The quick mode
 - How to get rid of the NULL-problem
 - Demonstrations
 - To cache or not to cache
@@ -11,6 +12,7 @@ Contents
 - License
 - Support
 - Project homepage
+- Versions
 
 Why another WSDL generator?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,6 +68,34 @@ still possible to change the SOAP endpoint location.
 
 Open the demo*.php files in your PHP source editor for some code examples.
 
+Note: PhpWsdl can include documentation tags in WSDL. But f.e. Visual Studio 
+won't use these documentations for IntelliSense. This is not a bug in PhpWsdl.
+
+The quick mode
+~~~~~~~~~~~~~~
+PhpWsdl can determine most of the required configuration to run a SOAP server. 
+The fastest way is:
+
+new PhpWsdl(true);
+
+TRUE enables the quick mode. This example requires the webservice handler 
+class to be in the same file. If the class is located in another file, you can 
+specify the file like this:
+
+new PhpWsdl(true,'class.soapdemo.php');
+
+Or, if there are multiple files to parse for WSDL definitions:
+
+new PhpWsdl(true,Array(
+	'class.soapdemo.php',
+	'class.complextypedemo.php'
+));
+
+When providing more than one file, be sure the first class in the first file 
+is the webservice handler class!
+
+Quick, isn't it?
+
 How to get rid of the NULL-problem
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When a SOAP client like .NET is making a SOAP request and a parameter is NULL, 
@@ -99,6 +129,8 @@ This package contains some demonstrations:
 	How to use PhpWsdl without PHP comment definitions of the WSDL elements
 - demo3.php
 	How to use the proxy to get rid of the NULL parameter problem
+- demo4.php
+	A quick and dirty single file usage example
 
 These demonstrations are using the following classes:
 - class.complextypedemo.php
@@ -106,7 +138,21 @@ These demonstrations are using the following classes:
 - class.soapdemo.php
 	A simple SOAP webservice class with some test methods
 
-All examples should produce equal and valid WSDL.
+All examples should produce equal and valid WSDL - except for the 
+documentation in demo2.php and demo4.php. To see how to add documentation to 
+the elements that are defined in demo2.php, have a look at the constructors of 
+the used classes.
+
+If you want to test PhpWsdl online without installing it on your own server, 
+you can try these URIs:
+
+http://wan24.de/test/phpwsdl/demo.php -> HTML documentation output & endpoint
+http://wan24.de/test/phpwsdl/demo.php?WSDL -> WSDL output
+
+demo2.php and demo3.php are available under the same location, too. If you try 
+the PDF download, you'll notice that you get other results as if you try it 
+from your server. This is because I used a valid license key for the HTML2PDF 
+API - PhpWsdl will then create a TOC and attach the WSDL files into the PDF.
 
 To cache or not to cache
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,3 +235,79 @@ http://wan24.de
 
 There you'll find some other projects and some free downloads that are maybe 
 interesting for you, too.
+
+Versions
+~~~~~~~~
+Note: See the diff in the respository for other changes that are not 
+documented here. Only smaller changes that not seem to be very important will 
+be undocumented.
+
+2011-07-30: 1.1
+Bugfix: PhpWsdl will now use the HTML2PDFAPI poroperty
+Bugfix: When determining the endpoint URI the http(s) selection didn't work 
+        for an SSL URI
+Bugfix: "is_boolean" should be "is_bool". Because of this bug the server 
+        was not able to run at construction time
+Bugfix: Found a typo in the HTML description: "occours" should be "occurs"
+Changed: Unoptimized WSDL won't be cached anymore
+Changed: PhpWsdl->CreateWsdl is now PhpWsdl->ParseFiles where is makes more 
+         sense
+Changed: The PhpWsdl->OutputHtmlHook can now return a true value to omit the 
+         internal HTML
+Changed: The PHP SoapServer is now started with SOAP_1_1 AND SOAP_1_2 per 
+         default
+Changed: The default namespace is now generated with the server environment 
+         information
+Changed: PhpWsdl trys to detect the name of the class that handles the SOAP 
+         requests
+Changed: PhpWsdl will use the "SCRIPT_FILENAME" if CreateWsdl is called 
+         without setting up the PhpWsdl->Files property
+Changed: Giving only TRUE to the PhpWsdl constructor will run the SOAP server 
+         by determining all configuration
+New: @pw_clear keyword to initialize the parser temporaries
+New: Added demo4.php to demonstrate how to use PhpWsdl in quick mode
+New: PhpWsdl has a quick mode now
+New: Added test URIs on my server so you can test PhpWsdl without installing 
+     it on your own server
+New: Added support for the HTML2PDF http API (see www.htmltopdf.de for more 
+     information) to enable licensed users to generate a PDF from the 
+     documentation with the WSDL files attached (in the PDF document itself)
+New: Complex types and public methods are now being sorted by their names in 
+     the HTML output 
+New: Now there is an index in the HTML description to jump to a definition
+New: The PhpWsdl->Force(Not)OutputWsdl/Html flags can enable and disable 
+     sending WSDL and/or HTML
+New: The options that are given to the PHP SoapServer constructor can be 
+     modified with the new PhpWsdl->SoapServerOptions array
+New: The HTML output can be downloaded as PDF when clicking the "Download this 
+     page as PDF" at the bottom of the document. This will only work in an 
+     internet environment without authentification! (See www.htmltopdf.de for 
+     more information)
+New: Documentation can be parsed and included in WSDL and the HTML output
+New: Setting "docs" holds the documentation for elements and will be filled by 
+     the file parser
+New: PhpWsdl->ParseDocs flag to enable parsing for documentation (enabled per 
+     default)
+New: PhpWsdl->IncludeDocs flag to enable including the documentation in WSDL, 
+     if the optimizer is disabled (enabled per default)
+New: Version history in readme.txt
+Info: Except for the change of the PhpWsdl->OutputHtmlHook behavior this 
+      version is fully compatible to version 1.0. The bugfixes are released in 
+      version 1.0.1, the download has been updated
+Info: There are plans for great improvements for this quick shot. The whole 
+      parsing engine could maybe been done with not more than only 3 regular 
+      expressions at all, f.e. The parser and the WSDL builder should support 
+      plugins to extend PhpWsdl very easy and compatible to future changes. 
+      All this will be a version 2.0. Until that version is released, version 
+      1.* will of course be continued.
+
+2001-07-29: 1.0.1
+Bugfix: When determining the endpoint URI the http(s) selection didn't work 
+        for an SSL URI
+Bugfix: "is_boolean" should be "is_bool". Because of this bug the server 
+        was not able to run at construction time
+Bugfix: Found a typo in the HTML description: "occours" should be "occurs"
+Info: This version is fully compatible to version 1.0.
+
+2011-07-28: 1.0
+The very first release version!

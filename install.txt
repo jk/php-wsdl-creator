@@ -22,7 +22,7 @@ To see a human readable HTML interface description, simply use this location:
 
 http://your-server.com/demo.php
 
-All demos should produce equal and valid WSDL. If something doesn't work, 
+Demos 1-3 should produce equal and valid WSDL. If something doesn't work, 
 be sure that your PHP installation includes the PHP SoapServer class! To 
 determine this, you can use this PHP script:
 

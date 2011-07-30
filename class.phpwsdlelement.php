@@ -44,6 +44,12 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 * @var int
 	 */
 	public $MaxOccurs=1;
+	/**
+	 * Documentation
+	 * 
+	 * @var string
+	 */
+	public $Docs=null;
 	
 	/**
 	 * Constructor
@@ -61,6 +67,8 @@ class PhpWsdlElement extends PhpWsdlParam{
 				$this->MinOccurs=$settings['minoccurs'];
 			if(isset($settings['maxoccurs']))
 				$this->MaxOccurs=$settings['maxoccurs'];
+			if(isset($settings['docs']))
+				$this->Docs=$settings['docs'];
 		}
 	}
 	
@@ -73,7 +81,16 @@ class PhpWsdlElement extends PhpWsdlParam{
 	public function CreateElement($pw){
 		$res="\t\t\t\t\t".'<s:element minOccurs="'.$this->MinOccurs.'" maxOccurs="'.$this->MaxOccurs.'" nillable="'.(($this->NillAble)?'true':'false').'" name="'.$this->Name.'" type="';
 		$res.=(in_array($this->Type,$pw->BasicTypes))?'s':'tns';
-		$res.=':'.$this->Type.'" />';
+		$res.=':'.$this->Type.'"';
+		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
+			$res.='>'."\n";
+			$res.="\t\t\t\t\t\t".'<s:annotation>'."\n";
+			$res.="\t\t\t\t\t\t\t".'<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
+			$res.="\t\t\t\t\t\t".'</s:annotation>'."\n";
+			$res.="\t\t\t\t\t".'</s:element>';
+		}else{
+			$res.=' />';
+		}
 		return $res;
 	}
 }

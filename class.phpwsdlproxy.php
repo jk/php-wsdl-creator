@@ -30,14 +30,15 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 
 global $PhpWsdlProxyClass,$PhpWsdlProxyServer;
 $PhpWsdlProxyClass=null;// This is an instance of the target class
-$PhpWsdlProxyServer=null;// This is the instance of the PhpWsdl class that runs the HPP SoapServer
+$PhpWsdlProxyServer=null;// This is the instance of the PhpWsdl class that runs the PHP SoapServer
 class PhpWsdlProxy{
 	public function __call($method,$param){
 		global $PhpWsdlProxyClass,$PhpWsdlProxyServer;
-		// Need to recreate to ensure that the types and methods arrays are present 
-		// (change the parameter to "false" if you're not using PHP comments for WSDL definitions at all)
+		// Need to parse the source to ensure that the types and methods arrays are present 
+		// (change the parameter to "false" if you're not using PHP comments for WSDL definitions at all, 
+		// comment out the "if" line, if you run in mixed mode)
 		if(sizeof($PhpWsdlProxyServer->Methods)<1)
-			$PhpWsdlProxyServer->CreateWsdl(true);
+			$PhpWsdlProxyServer->ParseSource();
 		// Check for missing parameters
 		$m=$PhpWsdlProxyServer->GetMethod($method);
 		if(!is_null($m)){
@@ -48,7 +49,7 @@ class PhpWsdlProxy{
 				$param=Array();
 				$pos=0;// Current index in the received parameter array
 				$i=-1;
-				while(++$i<$pLen)//TODO This regular expression is not very reliably in some cases when working with complex types
+				while(++$i<$pLen)//FIXME This regular expression is not very reliably in some cases when working with complex types
 					if(preg_match('/<([^>]+:)?'.$m->Param[$i]->Name.'>/',$req)){
 						// Parameter received -> use received value
 						$param[]=$temp[$pos];

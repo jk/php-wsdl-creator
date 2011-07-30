@@ -44,6 +44,12 @@ class PhpWsdlMethod{
 	 * @var PhpWsdlParam
 	 */
 	public $Return=null;
+	/**
+	 * Documentation
+	 * 
+	 * @var string
+	 */
+	public $Docs=null;
 	
 	/**
 	 * Constructor
@@ -59,25 +65,32 @@ class PhpWsdlMethod{
 			$this->Param=$param;
 		if(!is_null($return))
 			$this->Return=$return;
+		if(!is_null($settings))
+			if(isset($settings['docs']))
+				$this->Docs=$settings['docs'];
 	}
 	
 	/**
 	 * Create the port type WSDL
 	 * 
+	 * @param PhpWsdl $pw The PhpWsdl object
 	 * @return string The WSDL
 	 */
-	public function CreatePortType(){
+	public function CreatePortType($pw){
 		$res=Array();
 		$res[]="\t\t".'<wsdl:operation name="'.$this->Name.'"';
+		$o=sizeof($res)-1;
 		$pLen=sizeof($this->Param);
 		if($pLen>1){
 			$temp=Array();
 			$i=-1;
 			while(++$i<$pLen)
 				$temp[]=$this->Param[$i]->Name;
-			$res[sizeof($res)-1].=' parameterOrder="'.implode(' ',$temp).'"';
+			$res[$o].=' parameterOrder="'.implode(' ',$temp).'"';
 		}
-		$res[sizeof($res)-1].='>';
+		$res[$o].='>';
+		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs))
+			$res[]="\t\t\t".'<wsdl:documentation><![CDATA['.$this->Docs.']]></wsdl:documentation>';
 		$res[]="\t\t\t".'<wsdl:input message="tns:'.$this->Name.'SoapIn" />';
 		$res[]="\t\t\t".'<wsdl:output message="tns:'.$this->Name.'SoapOut" />';
 		$res[]="\t\t".'</wsdl:operation>';

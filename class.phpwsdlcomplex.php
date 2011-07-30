@@ -44,6 +44,12 @@ class PhpWsdlComplex{
 	 * @var boolean
 	 */
 	public $IsArray;
+	/**
+	 * Documentation
+	 * 
+	 * @var string
+	 */
+	public $Docs=null;
 	
 	/**
 	 * Constructor
@@ -56,6 +62,9 @@ class PhpWsdlComplex{
 		$this->IsArray=substr($name,strlen($name)-5,5)=='Array';
 		$this->Name=$name;
 		$this->Elements=$el;
+		if(!is_null($settings))
+			if(isset($settings['docs']))
+				$this->Docs=$settings['docs'];
 	}
 	
 	/**
@@ -67,6 +76,11 @@ class PhpWsdlComplex{
 	public function CreateType($pw){
 		$res=Array();
 		$res[]="\t\t\t".'<s:complexType name="'.$this->Name.'">';
+		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
+			$res[]="\t\t\t\t".'<s:annotation>';
+			$res[]="\t\t\t\t\t".'<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>';
+			$res[]="\t\t\t\t".'</s:annotation>';
+		}
 		if(!$this->IsArray){
 			$res[]="\t\t\t\t".'<s:sequence>';
 			$i=-1;

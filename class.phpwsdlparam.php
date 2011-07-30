@@ -38,6 +38,12 @@ class PhpWsdlParam{
 	 * @var string
 	 */
 	public $Type;
+	/**
+	 * Documentation
+	 * 
+	 * @var string
+	 */
+	public $Docs=null;
 	
 	/**
 	 * Constructor
@@ -49,6 +55,9 @@ class PhpWsdlParam{
 	public function PhpWsdlParam($name,$type='string',$settings=null){
 		$this->Name=$name;
 		$this->Type=$type;
+		if(!is_null($settings))
+			if(isset($settings['docs']))
+				$this->Docs=$settings['docs'];
 	}
 	
 	/**
@@ -60,7 +69,14 @@ class PhpWsdlParam{
 	public function CreatePart($pw){
 		$res="\t\t".'<wsdl:part name="'.$this->Name.'" type="';
 		$res.=(in_array($this->Type,$pw->BasicTypes))?'s':'tns';
-		$res.=':'.$this->Type.'" />';
+		$res.=':'.$this->Type.'"';
+		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
+			$res.='>'."\n";
+			$res.="\t\t\t".'<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
+			$res.="\t\t".'</wsdl:part>';
+		}else{
+			$res.=' />';
+		}
 		return $res;
 	}
 }

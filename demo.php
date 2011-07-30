@@ -32,6 +32,7 @@ $soap->CacheTime=0;						// Disable caching in PhpWsdl
 // Run the SOAP server
 if($soap->IsWsdlRequested())
 	$soap->Optimize=false;				// Don't optimize WSDL to send it human readable to the browser
+//$soap->ParseDocs=false;				// Uncomment this line to disable the documentation features
 $soap->RunServer();						// Finally, run the server
 
 // In an productive environment you may want to set the last parameter of the 
