@@ -169,7 +169,7 @@ class PhpWsdlHash{
 	/**
 	 * Constructor
 	 * 
-	 * @pw_omit
+	 * @pw_omitfnc
 	 * @param string $key The key
 	 * @param unknown_type $value The value
 	 */

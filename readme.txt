@@ -244,6 +244,9 @@ Note: See the diff in the respository for other changes that are not
 documented here. Only smaller changes that not seem to be very important will 
 stay undocumented.
 
+?: 2.0.1
+Bugfix: @pw_omit should be @pw_omitfnc in class.phpwsdlhash.php
+
 2011-07-31: 2.0
 Info: In earlier versions multiple complex types could be defined within one 
       comment block. Now every complex type has to be defined in its own 
