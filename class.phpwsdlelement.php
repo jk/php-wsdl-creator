@@ -62,7 +62,7 @@ class PhpWsdlElement extends PhpWsdlParam{
 		parent::PhpWsdlParam($name,$type);
 		if(!is_null($settings)){
 			if(isset($settings['nillable']))
-				$this->NillAble=$sttings['nillable']=='1'||$settings['nillable']=='true';
+				$this->NillAble=$settings['nillable']=='1'||$settings['nillable']=='true';
 			if(isset($settings['minoccurs']))
 				$this->MinOccurs=$settings['minoccurs'];
 			if(isset($settings['maxoccurs']))
@@ -80,8 +80,7 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 */
 	public function CreateElement($pw){
 		$res="\t\t\t\t\t".'<s:element minOccurs="'.$this->MinOccurs.'" maxOccurs="'.$this->MaxOccurs.'" nillable="'.(($this->NillAble)?'true':'false').'" name="'.$this->Name.'" type="';
-		$res.=(in_array($this->Type,$pw->BasicTypes))?'s':'tns';
-		$res.=':'.$this->Type.'"';
+		$res.=PhpWsdl::TranslateType($this->Type).'"';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
 			$res.='>'."\n";
 			$res.="\t\t\t\t\t\t".'<s:annotation>'."\n";
@@ -92,5 +91,25 @@ class PhpWsdlElement extends PhpWsdlParam{
 			$res.=' />';
 		}
 		return $res;
+	}
+	
+	/**
+	 * Interpret a element keyword
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretElement($data){
+		$info=explode(' ',$data['keyword'][1],3);
+		if(sizeof($info)<2)
+			return true;
+		$name=substr($info[1],1);
+		if(substr($name,strlen($name)-1,1)==';')
+			$name=substr($name,0,strlen($name)-1);
+		if(sizeof($info)>2)
+			$data['settings']['docs']=trim($info[2]);
+		$data['elements'][]=new PhpWsdlElement($name,$info[0],$data['settings']);
+		$data['settings']=Array();
+		return false;
 	}
 }

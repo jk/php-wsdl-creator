@@ -93,7 +93,7 @@ class PhpWsdlComplex{
 			$res[]="\t\t\t\t\t".'<s:restriction base="soapenc:Array">';
 			$res[]="\t\t\t\t\t\t".'<s:attribute ref="soapenc:arrayType" wsdl:arrayType="';
 			$type=substr($this->Name,0,strlen($this->Name)-5);
-			$res[sizeof($res)-1].=(in_array($type,$pw->BasicTypes))?'s':'tns';
+			$res[sizeof($res)-1].=(in_array($type,PhpWsdl::$BasicTypes))?'s':'tns';
 			$res[sizeof($res)-1].=':'.$type.'[]" />';
 			$res[]="\t\t\t\t\t".'</s:restriction>';
 			$res[]="\t\t\t\t".'</s:complexContent>';
@@ -115,5 +115,51 @@ class PhpWsdlComplex{
 			if($this->Elements[$i]->Name==$name)
 				return $this->Elements[$i];
 		return null;
+	}
+	
+	/**
+	 * Interpret a complex type
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretComplex($data){
+		$info=explode(' ',$data['keyword'][1],2);
+		if(sizeof($info)<1)
+			return true;
+		$data['type']=Array(
+			'id'			=>	'complex',
+			'name'			=>	$info[0],
+			'docs'			=>	(sizeof($info)>1)?$info[1]:null
+		);
+		return false;
+	}
+	
+	/**
+	 * Create complex type object
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function CreateComplexTypeObject($data){
+		if($data['method']!='')
+			return true;
+		if(!is_null($data['obj']))
+			return true;
+		if(!is_array($data['type']))
+			return true;
+		if(!isset($data['type']['id']))
+			return true;
+		if($data['type']['id']!='complex')
+			return true;
+		if(!is_null($data['docs'])){
+			$data['settings']['docs']=$data['docs'];
+		}else{
+			$data['settings']['docs']=$data['type']['docs'];
+		}
+		$data['obj']=new PhpWsdlComplex($data['type']['name'],$data['elements'],$data['settings']);
+		$data['settings']=Array();
+		$data['server']->Types[]=$data['obj'];
+		return true;
 	}
 }

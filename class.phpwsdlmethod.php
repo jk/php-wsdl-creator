@@ -171,4 +171,55 @@ class PhpWsdlMethod{
 				return $this->Param[$i];
 		return null;
 	}
+	
+	/**
+	 * Interpret a setting
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretSetting($data){
+		$info=explode(' ',$data['keyword'][1],2);
+		if(sizeof($info)<1)
+			return true;
+		$info=explode('=',$info[0],2);
+		if(sizeof($info)>1){
+			$data['settings'][$info[0]]=$info[1];
+		}else if(isset($data['settings'][$info[0]])){
+			unset($data['settings'][$info[0]]);
+		}
+		return false;
+	}
+	
+	/**
+	 * Interpret omit keyword
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretOmit($data){
+		$data['omit']=true;
+		return true;
+	}
+	
+	/**
+	 * Create method object
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function CreateMethodObject($data){
+		if(!is_null($data['obj']))
+			return true;
+		if($data['method']=='')
+			return true;
+		if(!is_null($data['type']))
+			return true;
+		if(!is_null($data['docs']))
+			$data['settings']['docs']=$data['docs'];
+		$data['obj']=new PhpWsdlMethod($data['method'],$data['param'],$data['return'],$data['settings']);
+		$data['settings']=Array();
+		$data['server']->Methods[]=$data['obj'];
+		return true;
+	}
 }

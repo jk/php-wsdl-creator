@@ -31,8 +31,10 @@ class SoapDemo{
 	 */
 	public function ComplexTypeArrayDemo($arr){
 		$res=Array();
-		foreach($arr as $a)
-			$res[]=$this->PrintVariable($a);
+		$i=-1;
+		$len=sizeof($arr);
+		while(++$i<$len)
+			$res[]=$this->PrintVariable($arr[$i]);
 		return $res;
 	}
 	
@@ -59,9 +61,9 @@ class SoapDemo{
 	 * This method should not be visible in WSDL - but notice:
 	 * If the PHP SoapServer doesn't know the WSDL, this method is still accessable for SOAP requests!
 	 * 
+	 * @pw_omitfnc
 	 * @param unknown_type $var
 	 * @return string
-	 * @pw_omitfnc
 	 */
 	public function PrintVariable($var){
 		return print_r($var,true);

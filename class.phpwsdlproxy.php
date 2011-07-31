@@ -27,20 +27,16 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 // only work, if the PhpWsdl class doesn't promote the WSDL to the SoapServer. 
 // But then returning complex types won't be easy anymore: You have to encode 
 // the return value with PHPs SoapVar object by yourself.
+//
+// Note: You should NOT use the proxy class in PhpWsdl quick mode!
 
-global $PhpWsdlProxyClass,$PhpWsdlProxyServer;
-$PhpWsdlProxyClass=null;// This is an instance of the target class
-$PhpWsdlProxyServer=null;// This is the instance of the PhpWsdl class that runs the PHP SoapServer
 class PhpWsdlProxy{
 	public function __call($method,$param){
-		global $PhpWsdlProxyClass,$PhpWsdlProxyServer;
 		// Need to parse the source to ensure that the types and methods arrays are present 
-		// (change the parameter to "false" if you're not using PHP comments for WSDL definitions at all, 
-		// comment out the "if" line, if you run in mixed mode)
-		if(sizeof($PhpWsdlProxyServer->Methods)<1)
-			$PhpWsdlProxyServer->ParseSource();
+		if(sizeof(PhpWsdl::$ProxyServer->Methods)<1)
+			PhpWsdl::$ProxyServer->CreateWsdl();
 		// Check for missing parameters
-		$m=$PhpWsdlProxyServer->GetMethod($method);
+		$m=PhpWsdl::$ProxyServer->GetMethod($method);
 		if(!is_null($m)){
 			$pLen=sizeof($m->Param);
 			if($pLen!=sizeof($param)){
@@ -63,7 +59,7 @@ class PhpWsdlProxy{
 		// Call the target method and return the response
 		return call_user_func_array(
 			Array(
-				$PhpWsdlProxyClass,
+				PhpWsdl::$ProxyObject,
 				$method
 			),
 			$param

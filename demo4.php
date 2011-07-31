@@ -6,6 +6,9 @@
 // specify the class filename(s) of your webservice as second parameter, if 
 // required. This together means that the SOAP namespace and the endpoint 
 // can't be defined in the PhpWsdl constructor when using the quick mode.
+// Note that not setting a cache folder may lead to warnings, if the system 
+// temporary directory is not writeable for your script in the webservers 
+// request context.
 require_once('class.phpwsdl.php');
 new PhpWsdl(true);// -> Don't waste my time - just run!
 

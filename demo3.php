@@ -26,7 +26,7 @@ $soap=new PhpWsdl(
 		'class.soapdemo.php',
 		'class.complextypedemo.php'
 	),
-	'SoapDemo',							// The name of the class that serves the webservice
+	null,								// The name of the class that serves the webservice will be determined by PhpWsdl
 	null,								// This demo contains all method definitions in comments
 	null,								// This demo contains all complex types in comments
 	false,								// Don't send WSDL right now

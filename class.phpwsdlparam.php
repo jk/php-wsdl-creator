@@ -68,8 +68,7 @@ class PhpWsdlParam{
 	 */
 	public function CreatePart($pw){
 		$res="\t\t".'<wsdl:part name="'.$this->Name.'" type="';
-		$res.=(in_array($this->Type,$pw->BasicTypes))?'s':'tns';
-		$res.=':'.$this->Type.'"';
+		$res.=PhpWsdl::TranslateType($this->Type).'"';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
 			$res.='>'."\n";
 			$res.="\t\t\t".'<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
@@ -78,5 +77,46 @@ class PhpWsdlParam{
 			$res.=' />';
 		}
 		return $res;
+	}
+	
+	/**
+	 * Interpret a parameter keyword
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretParam($data){
+		if($data['method']=='')
+			return true;
+		$info=explode(' ',$data['keyword'][1],3);
+		if(sizeof($info)<2)
+			return true;
+		$name=substr($info[1],1);
+		if(substr($name,strlen($name)-1,1)==';')
+			$name=substr($name,0,strlen($name)-1);
+		if(sizeof($info)>2)
+			$data['settings']['docs']=trim($info[2]);
+		$data['param'][]=new PhpWsdlParam($name,$info[0],$data['settings']);
+		$data['settings']=Array();
+		return false;
+	}
+	
+	/**
+	 * Interpret a return value
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretReturn($data){
+		if($data['method']=='')
+			return true;
+		$info=explode(' ',$data['keyword'][1],2);
+		if(sizeof($info)<1)
+			return true;
+		if(sizeof($info)>1)
+			$data['settings']['docs']=trim($info[1]);
+		$data['return']=new PhpWsdlParam($data['method'].'Result',$info[0],$data['settings']);
+		$data['settings']=Array();
+		return false;
 	}
 }

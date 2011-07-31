@@ -39,6 +39,7 @@ To use PhpWsdl you need these classes:
 - class.phpwsdlelement.php
 - class.pgpwsdlmethod.php
 - class.phpwsdlparam.php
+- class.phpwsdlparser.php
 - class.phpwsdlproxy.php
 
 You only need to include the 'class.phpwsdl.php' in your project to use 
@@ -63,7 +64,7 @@ the @pw_set keyword in comments. An example usage for settings can be found in
 class.complextypedemo.php.
 
 You don't have to specify the SOAP endpoint URI - PhpWsdl is able to determine 
-this settings. But since I don't know your environment and your purposes, it's 
+this setting. But since I don't know your environment and your purposes, it's 
 still possible to change the SOAP endpoint location.
 
 Open the demo*.php files in your PHP source editor for some code examples.
@@ -94,6 +95,13 @@ new PhpWsdl(true,Array(
 When providing more than one file, be sure the first class in the first file 
 is the webservice handler class!
 
+You even don't need to load your classes with "require_once" - let PhpWsdl do 
+it for you.
+
+Any other PhpWsdl constructor parameter will work as in normal mode - except 
+for the first two parameters and the last one: In quick mode the SOAP server 
+will be started, even if the last constructor parameter is FALSE.
+
 Quick, isn't it?
 
 How to get rid of the NULL-problem
@@ -114,12 +122,6 @@ the proxy yet - maybe coming soon.
 
 To see an example how to use the proxy, please look into demo3.php.
 
-There is another disadvantage when using the proxy: The WSDL must be generated 
-for most SOAP requests, not using the cache. This may be an performance issue. 
-A way to make this less ressource intensive you can create WSDL definitions 
-from code instead of using PHP comments (see demo2.php). Then PhpWsdl won't 
-need parsing your PHP source for a SOAP request.
-
 Demonstrations
 ~~~~~~~~~~~~~~
 This package contains some demonstrations:
@@ -132,7 +134,7 @@ This package contains some demonstrations:
 - demo4.php
 	A quick and dirty single file usage example
 
-These demonstrations are using the following classes:
+Some demonstrations are using the following classes:
 - class.complextypedemo.php
 	How to define a complex type and array types
 - class.soapdemo.php
@@ -141,18 +143,19 @@ These demonstrations are using the following classes:
 All examples should produce equal and valid WSDL - except for the 
 documentation in demo2.php and demo4.php. To see how to add documentation to 
 the elements that are defined in demo2.php, have a look at the constructors of 
-the used classes.
+the PhpWsdl* classes.
 
 If you want to test PhpWsdl online without installing it on your own server, 
 you can try these URIs:
 
-http://wan24.de/test/phpwsdl/demo.php -> HTML documentation output & endpoint
-http://wan24.de/test/phpwsdl/demo.php?WSDL -> WSDL output
+http://wan24.de/test/phpwsdl2/demo.php -> HTML documentation output & endpoint
+http://wan24.de/test/phpwsdl2/demo.php?WSDL -> WSDL output
 
-demo2.php and demo3.php are available under the same location, too. If you try 
-the PDF download, you'll notice that you get other results as if you try it 
-from your server. This is because I used a valid license key for the HTML2PDF 
-API - PhpWsdl will then create a TOC and attach the WSDL files into the PDF.
+demo2/3/4.php are available under the same location, too. If you try the PDF 
+download, you'll notice that you get other results as if you try it from your 
+server. This is because I used a valid license key for the HTML2PDF API - 
+PhpWsdl will then create a TOC and attach the WSDL files into the PDF, so it's 
+very easy for you to provide your webservice fully documented.
 
 To cache or not to cache
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,20 +163,19 @@ I recommend to use the WSDL caching feature of PhpWsdl. For this you need
 a writeable folder where PhpWsdl can write WSDL files to. Using the cache is 
 much faster in an productive environment. During development you may want to 
 disable caching (see the demo scripts for those two lines of code). To 
-completely disable the caching feature, you need to set the CacheFolder 
-property in your PhpWsdl instance to NULL. Without a cache folder (or when 
-using the proxy class) returning complex types needs attention: Use PHPs 
-SoapVar class to encode them properly.
+completely disable the caching feature, you need to set the static CacheFolder 
+property of PhpWsdl to NULL. Without a cache folder (or when using the proxy 
+class) returning complex types needs attention: Use PHPs SoapVar class to 
+encode them properly.
 
 Undocumented
 ~~~~~~~~~~~~
 Things that are not yet demonstrated are:
-- Adding/Removing predefined basic types in PhpWsdl->BasicTypes
+- Adding/Removing predefined basic types in PhpWsdl::$BasicTypes
 - Hooking in PhpWsdl (see inline documentation)
-- Adding support for more keywords to the definition parser in PhpWsdl (see 
-  inline documentation, you'll need to modify the regular expressions and use 
-  hooking)
-- How to handle hash arrays with PhpWsdlHashArrayBuilder
+- How to handle hash arrays with PhpWsdlHashArrayBuilder (see inline 
+  documentation)
+- How to develop extensions for an extended complex type support f.e.
 
 SOAP with JavaScript
 ~~~~~~~~~~~~~~~~~~~~
@@ -187,9 +189,9 @@ complex types...
 SOAP with Microsoft Visual Studio
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All tests using Microsoft Visual Studio 2010 ran without any problems. You can 
-add your webservice as service or web reference to yout project. Visual Studio 
+add your webservice as service or web reference to your project. Visual Studio 
 will then generate proxy classes and other things for you. Earlier or later 
-versions of Visual Studio or .NET should be also compatible.
+versions of Visual Studio or .NET should be compatible, too.
 
 License
 ~~~~~~~
@@ -240,15 +242,16 @@ Versions
 ~~~~~~~~
 Note: See the diff in the respository for other changes that are not 
 documented here. Only smaller changes that not seem to be very important will 
-be undocumented.
+stay undocumented.
+
+2011-07-31: 2.0
+Info: In earlier versions multiple complex types could be defined within one 
+      comment block. Now every complex type has to be defined in its own 
+      comment block. If multiple complex types are defined in a single 
+      comment block, only the first one will be visible! This is the only 
+      change in this version that affects the main usage of PhpWsdl.
 
 2011-07-30: 1.1
-Bugfix: PhpWsdl will now use the HTML2PDFAPI poroperty
-Bugfix: When determining the endpoint URI the http(s) selection didn't work 
-        for an SSL URI
-Bugfix: "is_boolean" should be "is_bool". Because of this bug the server 
-        was not able to run at construction time
-Bugfix: Found a typo in the HTML description: "occours" should be "occurs"
 Changed: Unoptimized WSDL won't be cached anymore
 Changed: PhpWsdl->CreateWsdl is now PhpWsdl->ParseFiles where is makes more 
          sense

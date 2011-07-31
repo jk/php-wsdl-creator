@@ -75,21 +75,33 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 // classes - or it's very easy to write your own.
 
 /**
- * Key/Value pair types for different value types
+ * Key/Value pair types for string value type
  * 
  * @pw_element string $key Key
  * @pw_element string $value Value
  * @pw_complex StringHash String hash array type
+ */
+/**
  * @pw_complex StringHashArray Array of string hash array types
+ */
+/**
+ * Key/Value pair types for int value type
  * 
  * @pw_element string $key Key
  * @pw_element int $value Value
  * @pw_complex IntHash Int hash array type
+ */
+/**
  * @pw_complex IntHashArray Array of int hash array types
+ */
+/**
+ * Key/Value pair types for boolean value type
  * 
  * @pw_element string $key Key
  * @pw_element boolean $value Value
  * @pw_complex BooleanHash Boolean hash array type
+ */
+/**
  * @pw_complex BooleanHashArray Array of boolean hash array types
  */
 
@@ -109,8 +121,11 @@ class PhpWsdlHashArrayBuilder{
 		if(is_null($hash))
 			return null;
 		$res=Array();
-		foreach(array_keys($hash) as $key)
-			$res[]=new PhpWsdlHash($key,$hash[$key]);
+		$keys=array_keys($hash);
+		$i=-1;
+		$len=sizeof($keys);
+		while(++$i<$len)
+			$res[]=new PhpWsdlHash($keys[$i],$hash[$keys[$i]]);
 		return $res;
 	}
 	
@@ -124,8 +139,10 @@ class PhpWsdlHashArrayBuilder{
 		if(is_null($arr))
 			return null;
 		$res=Array();
-		foreach($arr as $a)
-			$res[$a->Key]=$a->Value;
+		$i=-1;
+		$len=sizeof($arr);
+		while(++$i<$len)
+			$res[$arr[$i]->Key]=$arr[$i]->Value;
 		return $res;
 	}
 }
@@ -152,6 +169,7 @@ class PhpWsdlHash{
 	/**
 	 * Constructor
 	 * 
+	 * @pw_omit
 	 * @param string $key The key
 	 * @param unknown_type $value The value
 	 */

@@ -25,10 +25,12 @@ class ComplexTypeDemo{
 	public $Boolean=true;
 }
 
+// You can also create array types as complex type. Here for the string type and the ComplexTypeDemo complex type.
+// As you can see you simply need to add "Array" to the name of the type. Not one line of code.
+
 /**
- * You can also create array types as complex type. Here for the string type and the ComplexTypeDemo complex type.
- * As you can see you simply need to add "Array" to the name of the type. Not one line of code.
- * 
- * @pw_complex stringArray Defines a string array type
- * @pw_complex ComplexTypeDemoArray Defines an array of ComplexTypeDemo
+ * @pw_complex stringArray A string array type
+ */
+/**
+ * @pw_complex ComplexTypeDemoArray An array of ComplexTypeDemo
  */
