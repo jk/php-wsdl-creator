@@ -20,6 +20,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+PhpWsdl::RegisterHook('InterpretKeywordpw_elementHook','internal','PhpWsdlElement::InterpretElement');
+
 /**
  * An element of a complex type
  * 
@@ -59,6 +61,7 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 * @param array $settings Optional the settings hash array (default: NULL)
 	 */
 	public function PhpWsdlElement($name,$type,$settings=null){
+		PhpWsdl::Debug('New element '.$name);
 		parent::PhpWsdlParam($name,$type);
 		if(!is_null($settings)){
 			if(isset($settings['nillable']))
@@ -79,6 +82,7 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 * @return string The WSDL
 	 */
 	public function CreateElement($pw){
+		PhpWsdl::Debug('Create WSDL definition for element '.$this->Name);
 		$res="\t\t\t\t\t".'<s:element minOccurs="'.$this->MinOccurs.'" maxOccurs="'.$this->MaxOccurs.'" nillable="'.(($this->NillAble)?'true':'false').'" name="'.$this->Name.'" type="';
 		$res.=PhpWsdl::TranslateType($this->Type).'"';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
@@ -106,6 +110,7 @@ class PhpWsdlElement extends PhpWsdlParam{
 		$name=substr($info[1],1);
 		if(substr($name,strlen($name)-1,1)==';')
 			$name=substr($name,0,strlen($name)-1);
+		PhpWsdl::Debug('Interpret element '.$name);
 		if(sizeof($info)>2)
 			$data['settings']['docs']=trim($info[2]);
 		$data['elements'][]=new PhpWsdlElement($name,$info[0],$data['settings']);

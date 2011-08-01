@@ -20,6 +20,10 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+PhpWsdl::RegisterHook('InterpretKeywordpw_omitfncHook','internal','PhpWsdlMethod::InterpretOmit');
+PhpWsdl::RegisterHook('InterpretKeywordpw_setHook','internal','PhpWsdlMethod::InterpretSetting');
+PhpWsdl::RegisterHook('CreateObjectHook','internalmethod','PhpWsdlMethod::CreateMethodObject');
+
 /**
  * A method definition object
  * 
@@ -60,6 +64,7 @@ class PhpWsdlMethod{
 	 * @param array $settings Optional the settings hash array (default: NULL)
 	 */
 	public function PhPWsdlMethod($name,$param=null,$return=null,$settings=null){
+		PhpWsdl::Debug('New method '.$name);
 		$this->Name=$name;
 		if(!is_null($param))
 			$this->Param=$param;
@@ -77,6 +82,7 @@ class PhpWsdlMethod{
 	 * @return string The WSDL
 	 */
 	public function CreatePortType($pw){
+		PhpWsdl::Debug('Create WSDL port type for method '.$this->Name);
 		$res=Array();
 		$res[]="\t\t".'<wsdl:operation name="'.$this->Name.'"';
 		$o=sizeof($res)-1;
@@ -104,6 +110,7 @@ class PhpWsdlMethod{
 	 * @return string The WSDL
 	 */
 	public function CreateBinding($pw){
+		PhpWsdl::Debug('Create WSDL binding for method '.$this->Name);
 		$res=Array();
 		$res[]="\t\t".'<wsdl:operation name="'.$this->Name.'">';
 		$res[]="\t\t\t".'<soap:operation soapAction="'.$pw->NameSpace.$this->Name.'" />';
@@ -136,6 +143,7 @@ class PhpWsdlMethod{
 	 * @return string The WSDL
 	 */
 	public function CreateMessages($pw){
+		PhpWsdl::Debug('Create WSDL message for method '.$this->Name);
 		$pLen=sizeof($this->Param);
 		$res=Array();
 		if($pLen<1){
@@ -164,11 +172,14 @@ class PhpWsdlMethod{
 	 * @return PhpWsdlParam The parameter or NULL, if not found
 	 */
 	public function GetParam($name){
+		PhpWsdl::Debug('Find parameter '.$name);
 		$i=-1;
 		$len=sizeof($this->Param);
 		while(++$i<$len)
-			if($this->Param[$i]->Name==$name)
+			if($this->Param[$i]->Name==$name){
+				PhpWsdl::Debug('Found parameter at index '.$i);
 				return $this->Param[$i];
+			}
 		return null;
 	}
 	
@@ -182,6 +193,7 @@ class PhpWsdlMethod{
 		$info=explode(' ',$data['keyword'][1],2);
 		if(sizeof($info)<1)
 			return true;
+		PhpWsdl::Debug('Intrepret setting '.$info[0]);
 		$info=explode('=',$info[0],2);
 		if(sizeof($info)>1){
 			$data['settings'][$info[0]]=$info[1];
@@ -198,6 +210,7 @@ class PhpWsdlMethod{
 	 * @return boolean Response
 	 */
 	public static function InterpretOmit($data){
+		PhpWsdl::Debug('Interpret omitfnc');
 		$data['omit']=true;
 		return true;
 	}
@@ -215,6 +228,7 @@ class PhpWsdlMethod{
 			return true;
 		if(!is_null($data['type']))
 			return true;
+		PhpWsdl::Debug('Add method '.$data['method']);
 		if(!is_null($data['docs']))
 			$data['settings']['docs']=$data['docs'];
 		$data['obj']=new PhpWsdlMethod($data['method'],$data['param'],$data['return'],$data['settings']);

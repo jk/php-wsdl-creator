@@ -11,10 +11,10 @@ require_once('class.complextypedemo.php');
 
 // Initialize the PhpWsdl class
 require_once('class.phpwsdl.php');
-$soap=new PhpWsdl(
-	null,								// This demo uses the default namespace http://tempuri.org/
+$soap=PhpWsdl::CreateInstance(
+	null,								// PhpWsdl will determine a good namespace
 	null,								// Change this to your SOAP endpoint URI (or keep it NULL and PhpWsdl will determine it)
-	'./cache/',							// Change this to a folder with write access
+	'./cache',							// Change this to a folder with write access
 	Array(								// All files with WSDL definitions in comments
 		'class.soapdemo.php',
 		'class.complextypedemo.php'

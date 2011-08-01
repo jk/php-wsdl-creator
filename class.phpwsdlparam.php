@@ -20,6 +20,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+PhpWsdl::RegisterHook('InterpretKeywordparamHook','internal','PhpWsdlParam::InterpretParam');
+PhpWsdl::RegisterHook('InterpretKeywordreturnHook','internal','PhpWsdlParam::InterpretReturn');
+	
 /**
  * A parameter or return value definition for a method
  * 
@@ -53,6 +56,7 @@ class PhpWsdlParam{
 	 * @param array $settings Optional the settings hash array (default: NULL)
 	 */
 	public function PhpWsdlParam($name,$type='string',$settings=null){
+		PhpWsdl::Debug('New parameter '.$name);
 		$this->Name=$name;
 		$this->Type=$type;
 		if(!is_null($settings))
@@ -67,6 +71,7 @@ class PhpWsdlParam{
 	 * @return string The WSDL
 	 */
 	public function CreatePart($pw){
+		PhpWsdl::Debug('Create WSDL definition for parameter part '.$this->Name);
 		$res="\t\t".'<wsdl:part name="'.$this->Name.'" type="';
 		$res.=PhpWsdl::TranslateType($this->Type).'"';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
@@ -94,6 +99,7 @@ class PhpWsdlParam{
 		$name=substr($info[1],1);
 		if(substr($name,strlen($name)-1,1)==';')
 			$name=substr($name,0,strlen($name)-1);
+		PhpWsdl::Debug('Interpret parameter '.$name);
 		if(sizeof($info)>2)
 			$data['settings']['docs']=trim($info[2]);
 		$data['param'][]=new PhpWsdlParam($name,$info[0],$data['settings']);
@@ -113,6 +119,7 @@ class PhpWsdlParam{
 		$info=explode(' ',$data['keyword'][1],2);
 		if(sizeof($info)<1)
 			return true;
+		PhpWsdl::Debug('Interpret return');
 		if(sizeof($info)>1)
 			$data['settings']['docs']=trim($info[1]);
 		$data['return']=new PhpWsdlParam($data['method'].'Result',$info[0],$data['settings']);

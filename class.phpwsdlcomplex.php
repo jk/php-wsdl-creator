@@ -20,6 +20,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+PhpWsdl::RegisterHook('InterpretKeywordpw_complexHook','internal','PhpWsdlComplex::InterpretComplex');
+PhpWsdl::RegisterHook('CreateObjectHook','internalcomplex','PhpWsdlComplex::CreateComplexTypeObject');
+
 /**
  * This class creates complex types (classes or arrays)
  * 
@@ -82,6 +85,7 @@ class PhpWsdlComplex{
 			$res[]="\t\t\t\t".'</s:annotation>';
 		}
 		if(!$this->IsArray){
+			PhpWsdl::Debug('Create WSDL definition for type '.$this->Name.' as type');
 			$res[]="\t\t\t\t".'<s:sequence>';
 			$i=-1;
 			$len=sizeof($this->Elements);
@@ -89,6 +93,7 @@ class PhpWsdlComplex{
 				$res[]=$this->Elements[$i]->CreateElement($pw);
 			$res[]="\t\t\t\t".'</s:sequence>';
 		}else{
+			PhpWsdl::Debug('Create WSDL definition for type '.$this->Name.' as array');
 			$res[]="\t\t\t\t".'<s:complexContent>';
 			$res[]="\t\t\t\t\t".'<s:restriction base="soapenc:Array">';
 			$res[]="\t\t\t\t\t\t".'<s:attribute ref="soapenc:arrayType" wsdl:arrayType="';
@@ -109,11 +114,14 @@ class PhpWsdlComplex{
 	 * @return PhpWsdlElement The element or NULL, if not found
 	 */
 	public function GetElement($name){
+		PhpWsdl::Debug('Find element '.$name);
 		$i=-1;
 		$len=sizeof($this->Elements);
 		while(++$i<$len)
-			if($this->Elements[$i]->Name==$name)
+			if($this->Elements[$i]->Name==$name){
+				PhpWsdl::Debug('Found element at index '.$i);
 				return $this->Elements[$i];
+			}
 		return null;
 	}
 	
@@ -127,6 +135,7 @@ class PhpWsdlComplex{
 		$info=explode(' ',$data['keyword'][1],2);
 		if(sizeof($info)<1)
 			return true;
+		PhpWsdl::Debug('Interpreted complex type '.$info[0]);
 		$data['type']=Array(
 			'id'			=>	'complex',
 			'name'			=>	$info[0],
@@ -157,6 +166,7 @@ class PhpWsdlComplex{
 		}else{
 			$data['settings']['docs']=$data['type']['docs'];
 		}
+		PhpWsdl::Debug('Add complex type '.$data['type']['name']);
 		$data['obj']=new PhpWsdlComplex($data['type']['name'],$data['elements'],$data['settings']);
 		$data['settings']=Array();
 		$data['server']->Types[]=$data['obj'];

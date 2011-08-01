@@ -10,7 +10,7 @@
 // temporary directory is not writeable for your script in the webservers 
 // request context.
 require_once('class.phpwsdl.php');
-new PhpWsdl(true);// -> Don't waste my time - just run!
+$soap=PhpWsdl::CreateInstance(true);// -> Don't waste my time - just run!
 
 // This is the SOAP webservice handler demo class
 class SoapDemo{

@@ -29,7 +29,7 @@ thin, fast and ComplexType-supporting WSDL generator for my PHP webservices -
 and maybe yours?
 
 If this isn't enough for your application, I recommend you to have a look at 
-NuSOAP (sourceforge.net/projects/nusoap).
+Zend.
 
 How to use PhpWsdl
 ~~~~~~~~~~~~~~~~~~
@@ -140,10 +140,10 @@ Some demonstrations are using the following classes:
 - class.soapdemo.php
 	A simple SOAP webservice class with some test methods
 
-All examples should produce equal and valid WSDL - except for the 
-documentation in demo2.php and demo4.php. To see how to add documentation to 
-the elements that are defined in demo2.php, have a look at the constructors of 
-the PhpWsdl* classes.
+The demos 1-3 should produce equal and valid WSDL - except for the 
+documentation in demo2.php. To see how to add documentation to the elements 
+that are defined in demo2.php, have a look at the constructors of the 
+PhpWsdl* classes.
 
 If you want to test PhpWsdl online without installing it on your own server, 
 you can try these URIs:
@@ -185,6 +185,11 @@ complex types as JavaScript object. But sending a complex type to the
 webservice failed with some constructor-problem within the SOAPClient class. 
 Currently I haven't worked on a solution for this problem because I don't use 
 complex types...
+
+If you want to use foreign SOAP webservices with your AJAX application, you 
+need to use a SOAP webservice proxy. Have a look at the folder "ajax" for a 
+quick howto with PhpWsdl. Warning: This class is currently not recommend for 
+productive environments because the status is still pre-Alpha!
 
 SOAP with Microsoft Visual Studio
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -244,8 +249,32 @@ Note: See the diff in the respository for other changes that are not
 documented here. Only smaller changes that not seem to be very important will 
 stay undocumented.
 
-?: 2.0.1
+2011-08-01: 2.1
 Bugfix: @pw_omit should be @pw_omitfnc in class.phpwsdlhash.php
+Bugfix: Hook calls in PhpWsdl->RunServer didn't use a hash array as parameter
+Bugfix: Some predefined hooks didn't use 'Hook' as postfix of their name
+Bugfix: Extension loading failed because the generated filename didn't match
+Bugfix: PhpWsdl::Init method was called too late
+Changed: Some code from the PhpWsdl::Init method that is related to other 
+         classes is now replaced to the top of the mathing class definition
+Changed: Most internal hook handlers will now return TRUE to give your own 
+         handlers a chance to run
+New: Started to add debugging informations
+New: $class in PhpWsdl->RunServer may be an instance of an object that will 
+     become provided to the PHP SoapServer by the setObject method.
+New: The static PhpWsdl::CreateInstance method is the new way to create an 
+     instance of PhpWsdl to be compatible to extensions.
+New: The PHP SoapServer object is now accessable with the SoapServer property
+New: The NuSOAP adapter lets you use NuSOAP as SOAP server
+New: The Zend adapter lets you use Zend as SOAP server
+New: Proxy webservice for forwarding AJAX SOAP requests to another SOAP 
+     webservice
+Info: If you used the PrepareServerHook or RunServerHook, you should notice 
+      the bugfix: Your handler method will now receive an hash array! Please 
+      update your code to be compatible.
+Info: If you used any hook without the 'Hook' postfix, you should notice the 
+      bugfix: Their names have now the 'Hook' postfix!
+Todo: Add more debug messages
 
 2011-07-31: 2.0
 Info: In earlier versions multiple complex types could be defined within one 

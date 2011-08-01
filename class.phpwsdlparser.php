@@ -63,6 +63,7 @@ class PhpWsdlParser{
 	 * @param PhpWsdl $server The PhpWsdl object
 	 */
 	public function PhpWsdlParser($server){
+		PhpWsdl::Debug('New PhpWsdlParser');
 		$this->Server=$server;
 	}
 	
@@ -72,6 +73,7 @@ class PhpWsdlParser{
 	 * @param string $str The string to parse
 	 */
 	public function Parse($str){
+		PhpWsdl::Debug('Parse a string');
 		if(!PhpWsdl::CallHook(
 				'BeforeParseHook',
 				Array(
@@ -87,6 +89,7 @@ class PhpWsdlParser{
 		preg_match_all(PhpWsdlParser::$ParseRelevantRx,$str,$defs);
 		$i=-1;
 		$len=sizeof($defs[0]);
+		PhpWsdl::Debug('Matched '.$len.' relevant strings to parse');
 		while(++$i<$len){
 			$def=$defs[1][$i];
 			$method=$defs[3][$i];
@@ -101,6 +104,8 @@ class PhpWsdlParser{
 					$temp[2][$j],
 					trim($temp[3][$j])
 				);
+			if(PhpWsdl::$Debugging)
+				PhpWsdl::Debug('Keywords: '.print_r($keywords,true));
 			// Parse documentation
 			if($this->Server->ParseDocs){
 				$docs=Array();
@@ -113,6 +118,8 @@ class PhpWsdlParser{
 				$docs=trim(implode("\n",$docs));
 				if($docs=='')
 					$docs=null;
+				if(PhpWsdl::$Debugging)
+					PhpWsdl::Debug('Docs: '.print_r($docs,true));
 			}else{
 				$docs=null;
 			}
@@ -136,6 +143,7 @@ class PhpWsdlParser{
 	 * @param string $method Method name
 	 */
 	public function InterpretDefinition($def,$method,$keywords,$docs){
+		PhpWsdl::Debug('Interpret definition');
 		if(!PhpWsdl::CallHook(
 				'BeforeInterpretDefinitionHook',
 				Array(
@@ -162,6 +170,8 @@ class PhpWsdlParser{
 		$len=sizeof($keywords);
 		while(++$i<$len){
 			$keyword=$keywords[$i];
+			if(PhpWsdl::$Debugging)
+				PhpWsdl::Debug('Interpret keyword '.print_r($keyword,true));
 			// Call the global keyword handler
 			if(!PhpWsdl::CallHook(
 					'InterpretKeywordHook',
@@ -212,6 +222,7 @@ class PhpWsdlParser{
 				continue;
 			if($omit)
 				return null;
+			PhpWsdl::Debug('Keyword not handled');
 		}
 		// Create object
 		$obj=null;
@@ -257,6 +268,7 @@ class PhpWsdlParser{
 			)
 		)
 			return null;
+		PhpWsdl::Debug('Object '.((is_null($obj))?'not created':'created'));
 		return $obj;
 	}
 }

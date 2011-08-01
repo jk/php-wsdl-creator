@@ -32,6 +32,8 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 
 class PhpWsdlProxy{
 	public function __call($method,$param){
+		if(PhpWsdl::$Debugging)
+			PhpWsdl::Debug('Proxy call method '.$method.': '.print_r($param));
 		// Need to parse the source to ensure that the types and methods arrays are present 
 		if(sizeof(PhpWsdl::$ProxyServer->Methods)<1)
 			PhpWsdl::$ProxyServer->CreateWsdl();
@@ -45,6 +47,7 @@ class PhpWsdlProxy{
 				$param=Array();
 				$pos=0;// Current index in the received parameter array
 				$i=-1;
+				PhpWsdl::Debug('Add NULL parameters');
 				while(++$i<$pLen)//FIXME This regular expression is not very reliably in some cases when working with complex types
 					if(preg_match('/<([^>]+:)?'.$m->Param[$i]->Name.'>/',$req)){
 						// Parameter received -> use received value
@@ -52,6 +55,7 @@ class PhpWsdlProxy{
 						$pos++;
 					}else{
 						// Missing parameter -> insert NULL value
+						PhpWsdl::Debug($m->Param[$i]->Name.' was missing');
 						$param[]=null;
 					}
 			}
