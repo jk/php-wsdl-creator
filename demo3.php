@@ -41,7 +41,7 @@ if($soap->IsWsdlRequested())
 	$soap->Optimize=false;				// Don't optimize WSDL to send it human readable to the browser
 $soap->RunServer(						// Finally, run the server and enable the proxy
 	null,
-	Array(								// Use an array for this parameter to enable the proxy
+	Array(								// Use an array for this parameter to enable the proxy:
 		'SoapDemo',						// The name of the target class that will handle SOAP requests
 		new SoapDemo()					// An instance of the target class that will handle SOAP requests
 	)

@@ -21,7 +21,7 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
 // Initialize PhpWsdl
-PhpWsdl::$Debugging=true;// Uncomment this line to enable debugging
+//PhpWsdl::$Debugging=true;// Uncomment this line to enable debugging
 PhpWsdl::Init();
 	
 // You don't require class.phpwsdlelement.php and class.phpwsdlcomplex.php, 
@@ -41,7 +41,7 @@ require_once(dirname(__FILE__).'/class.phpwsdlparser.php');
  * 
  * @author Andreas Zimmermann
  * @copyright ©2011 Andreas Zimmermann, wan24.de
- * @version 2.0
+ * @version 2.1.1
  */
 class PhpWsdl{
 	/**
@@ -137,6 +137,7 @@ class PhpWsdl{
 	 * @var string[]
 	 */
 	public static $BasicTypes=Array(
+		'anyType',
 		'anyURI',
 		'base64Binary',
 		'boolean',
@@ -267,6 +268,18 @@ class PhpWsdl{
 	 * @var boolean
 	 */
 	public static $Debugging=false;
+	/**
+	 * The debug file to write to
+	 * 
+	 * @var string
+	 */
+	public static $DebugFile=null;
+	/**
+	 * WSDL namespaces
+	 * 
+	 * @var array
+	 */
+	public static $NameSpaces=null;
 	
 	/**
 	 * PhpWsdl constructor
@@ -661,7 +674,13 @@ class PhpWsdl{
 		$res=&$data['res'];
 		$server=$data['server'];
 		$res[]='<?xml version="1.0" encoding="UTF-8"?>';
-		$res[]='<wsdl:definitions xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="'.$server->NameSpace.'" xmlns:s="http://www.w3.org/2001/XMLSchema" targetNamespace="'.$server->NameSpace.'" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/">';
+		$temp=Array();
+		$keys=array_keys(self::$NameSpaces);
+		$i=-1;
+		$len=sizeof($keys);
+		while(++$i<$len)
+			$temp[]='xmlns:'.$keys[$i].'="'.self::$NameSpaces[$keys[$i]].'"';
+		$res[]='<wsdl:definitions xmlns:tns="'.$server->NameSpace.'" targetNamespace="'.$server->NameSpace.'" '.implode(' ',$temp).'>';
 		return true;
 	}
 	
@@ -1550,7 +1569,7 @@ class PhpWsdl{
 		if(is_null($file))
 			$file=$this->GetCacheFileName();
 		self::Debug('Check cache file exists '.$file);
-		return file_exists($file)&&file_exists($file.'.cache')&&file_exists($file.'.obj');
+		return file_exists($file)&&file_exists($file.'.cache');
 	}
 	
 	/**
@@ -1696,15 +1715,21 @@ class PhpWsdl{
 	 * Delete cache files from the cache folder
 	 * 
 	 * @param boolean $mineOnly Only delete the cache files for this definition? (default: FALSE)
+	 * @param boolean $cleanUp Only delete the cache files that are timed out? (default: FALSE)
 	 * @return string[] The deleted filenames
 	 */
-	public function TidyCacheFolder($mineOnly=false){
+	public function TidyCacheFolder($mineOnly=false,$cleanUp=false){
 		if(is_null(self::$CacheFolder))
 			return Array();
 		$deleted=Array();
+		if($cleanUp)
+			self::Debug('Cleanup cache');
 		if($mineOnly){
 			self::Debug('Delete own cache');
 			$file=$this->GetCacheFileName();
+			if($cleanUp)
+				if($this->IsCacheValid($file))
+					return $deleted;
 			if(file_exists($file))
 				if(unlink($file))
 					$deleted[]=$file;
@@ -1716,22 +1741,39 @@ class PhpWsdl{
 					$deleted[]=$file.'.obj';
 			self::Debug(sizeof($deleted).' files deleted');
 		}else{
-			self::Debug('Clear cache');
-			$files=glob(self::$CacheFolder.'/*.wsd*');
+			self::Debug('Delete whole cache');
+			$files=glob(self::$CacheFolder.(($cleanUp)?'/*.wsdl':'/*.wsd*'));
 			if($files!==false){
+				$toDelete=Array();
 				$i=-1;
 				$len=sizeof($files);
 				while(++$i<$len){
-					if(!preg_match('/\.wsdl(\.cache|\.obj)?$/',$files[$i]))
-						continue;
 					$file=$files[$i];
-					if(unlink($files[$i]))
-						$deleted[]=$files[$i];
+					if($cleanUp){
+						if(!$this->IsCacheValid($file))
+							continue;
+						$toDelete[]=$file;
+						$toDelete[]=$file.'.cache';
+						$toDelete[]=$file.'.obj';
+					}else{
+						if(!preg_match('/\.wsdl(\.cache|\.obj)?$/',$file))
+							continue;
+						if(unlink($files[$i]))
+							$deleted[]=$files[$i];
+					}
 				}
+				if($cleanUp){
+					$i=-1;
+					$len=sizeof($toDelete);
+					while(++$i<$len)
+						if(file_exists($toDelete[$i]))
+							if(unlink($toDelete[$i]))
+								$deleted[]=$toDelete[$i];
+				}
+				self::Debug(sizeof($deleted).' files deleted');
 			}else{
 				self::Debug('"glob" failed');
 			}
-			self::Debug(sizeof($deleted).' files deleted');
 		}
 		return $deleted;
 	}
@@ -1743,6 +1785,14 @@ class PhpWsdl{
 	 * @return string The translates type name
 	 */
 	public static function TranslateType($type){
+		if(!self::CallHook(
+				'TranslateTypeHook',
+				Array(
+					'type'			=>	&$type
+				)
+			)
+		)
+			return $type;
 		return ((in_array($type,self::$BasicTypes))?'s:':'tns:').$type;
 	}
 	
@@ -1814,7 +1864,10 @@ class PhpWsdl{
 	public static function Debug($str){
 		if(!self::$Debugging)
 			return;
-		self::$DebugInfo[]=date('Y-m-d H:i:s')."\t".$str;
+		$temp=date('Y-m-d H:i:s')."\t".$str;
+		self::$DebugInfo[]=$temp;
+		if(!is_null(self::$DebugFile))
+			file_put_contents(self::$DebugFile,$temp."\n",FILE_APPEND);
 	}
 
 	/**
@@ -1826,6 +1879,12 @@ class PhpWsdl{
 		self::$HTML2PDFSettings=Array(
 			'attachments'	=>	'1',
 			'outline'		=>	'1'
+		);
+		self::$NameSpaces=Array(
+			'soap'			=>	'http://schemas.xmlsoap.org/wsdl/soap/',
+			's'				=>	'http://www.w3.org/2001/XMLSchema',
+			'wsdl'			=>	'http://schemas.xmlsoap.org/wsdl/',
+			'soapenc'		=>	'http://schemas.xmlsoap.org/soap/encoding/'
 		);
 		self::$CacheFolder=sys_get_temp_dir();
 		self::$Config['extensions']=Array();

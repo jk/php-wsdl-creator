@@ -17,16 +17,8 @@ You should have received a copy of the GNU General Public License along with
 this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-//FIXME Status: Pre-Alpha!
-
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
-
-/**
- * An array of string
- * 
- * @pw_complex stringArray An array of string
- */
 
 /**
  * This webservice forwards a SOAP request to another SOAP server using PHPs SoapClient class.
@@ -65,12 +57,26 @@ class PhpWsdlAjax{
 	
 	/**
 	 * Will run the webservice
+	 * 
+	 * @param boolean $useProxy Use the proxy class?
 	 */
-	public static function Run(){
+	public static function Run($useProxy=false){
 		if(!class_exists('PhpWsdl'))
 			require_once(dirname(__FILE__).'/class.phpwsdl.php');
 		PhpWsdl::Debug('Running AJAX proxy');
-		PhpWsdl::CreateInstance(true,$_SERVER['SCRIPT_FILENAME']);
+		if(!$useProxy){
+			PhpWsdl::CreateInstance(true,__FILE__);
+		}else{
+			PhpWsdl::Debug('Using PhpWsdlProxy');
+			$soap=PhpWsdl::CreateInstance(null,null,null,__FILE__);
+			$soap->RunServer(
+				null,
+				Array(
+					'PhpWsdlAjax',
+					new PhpWsdlAjax()
+				)
+			);
+		}
 	}
 	
 	/**
@@ -79,12 +85,21 @@ class PhpWsdlAjax{
 	 * another URI than your website is located. Modern browsers deny AJAX requests to foreign 
 	 * servers. So you need this proxy webservice that forwards your request.
 	 * 
+	 * $parameters needs to be an JSON array - f.e.:
+	 * 
+	 * ["string Parameter",123,true]
+	 * 
+	 * $options and $requestHeaders are JSON encoded hash (string key/string value) arrays.
+	 * 
+	 * For information how to produce JSON encoded objects (or how to decode them), please visit 
+	 * http://www.json.org/js.html
+	 * 
 	 * @param string $wsdl The WSDL filename or URI
 	 * @param string $method The method name
-	 * @param stringArray $param The methods parameters
-	 * @param stringArray $options The options array
-	 * @param string $requestHeaders The requestHeaders (JSON string)
-	 * @return string JSON encoded response string
+	 * @param string $param The parameters array (JSON encoded object)
+	 * @param string $options The options array (JSON encoded object)
+	 * @param string $requestHeaders The requestHeaders array (JSON encoded object)
+	 * @return string JSON encoded response object
 	 */
 	public function Forward($wsdl,$method,$param,$options,$requestHeaders){
 		// Prepare parameters
@@ -97,19 +112,16 @@ class PhpWsdlAjax{
 		)=Array(
 			(!is_null(self::$WSDL))?self::$WSDL:utf8_decode($wsdl),
 			utf8_decode($method),
-			$param,
-			(!is_null(self::$Options))?self::$Options:$options,
-			(is_null($requestHeaders))?null:json_decode(utf8_decode($requestHeaders))
+			json_decode(utf8_decode($param)),
+			(is_null($options)||!is_null(self::$Options))?self::$Options:json_decode(utf8_decode($options)),
+			(is_null($requestHeaders)||!is_null(self::$RequestHeaders))?self::$RequestHeaders:json_decode(utf8_decode($requestHeaders))
 		);
 		if(is_array($options)&&sizeof($options)<1)
 			$options=null;
-		if(!is_null(self::$RequestHeaders)){
-			$requestHeaders=self::$RequestHeaders;
-		}else if($requestHeaders===''||(is_array($requestHeaders)&&sizeof($requestHeaders)<1)){
+		if(is_array($requestHeaders)&&sizeof($requestHeaders)<1)
 			$requestHeaders=null;
-		}
-		PhpWsdl::Debug('Forward '.$method.' to '.$wsdl);
 		// Check restrictions
+		PhpWsdl::Debug('Forward "'.$method.'" to '.$wsdl);
 		$rLen=sizeof(self::$Restrict);
 		if($rLen>0){
 			$i=-1;
@@ -125,8 +137,86 @@ class PhpWsdlAjax{
 				throw(new Exception('Request URI forbidden'));
 			}
 		}
+		// Check the cache
+		$file=self::GetWsdlCacheFilename($wsdl);
+		if(self::IsCacheValid($file)){
+			PhpWsdl::Debug('Using cached WSDL');
+			$wsdl=$file;
+		}else if(self::WriteWsdlToCache($wsdl,$file)){
+			PhpWsdl::Debug('Using WSDL from cache');
+			$wsdl=$file;
+		}else{
+			PhpWsdl::Debug('Cache not available');
+		}
 		// Forward the request
+		PhpWsdl::Debug('Forward the request using WSDL from '.$wsdl);
 		$client=new SoapClient($wsdl);
-		return utf8_encode(json_encode($client->__soapCall($method,$param,$options,$requestHeaders)));
+		PhpWsdl::Debug('Client created');
+		if(PhpWsdl::$Debugging)
+			PhpWsdl::Debug('Parameters: '.print_r($param,true));
+		$res=$client->__soapCall($method,$param,$options,$requestHeaders);
+		if(PhpWsdl::$Debugging)
+			PhpWsdl::Debug('Response: '.print_r($res,true));
+		return json_encode($res);
+	}
+	
+	/**
+	 * Determine if the cache is valid
+	 * 
+	 * @param string $file The WSDL cache filename
+	 * @return boolean Valid?
+	 */
+	public static function IsCacheValid($file){
+		if(is_null($file))
+			return false;
+		if(!file_exists($file)||!file_exists($file.'.cache'))
+			return false;
+		if(PhpWsdl::$CacheTime>=0&&time()-file_get_contents($file.'.cache')>PhpWsdl::$CacheTime)
+			return false;
+		return true;
+	}
+	
+	/**
+	 * Write WSDL to cache
+	 * 
+	 * @param string $wsdl The WSDL URI
+	 * @param string $file The cache filename
+	 * @return boolean Succeed?
+	 */
+	public static function WriteWsdlToCache($wsdl,$file=null){
+		if(is_file($wsdl))
+			return false;
+		if(is_null($file)){
+			$file=self::GetWsdlCacheFilename($wsdl);
+			if(is_null($file))
+				return false;
+		}
+		PhpWsdl::Debug('Write "'.$wsdl.'" to cache '.$file);
+		$xml=file_get_contents($wsdl);
+		if($xml===false){
+			PhpWsdl::Debug('Could not get WSDL from '.$wsdl);
+			return false;
+		}
+		if(file_put_contents($file,$xml)===false){
+			PhpWsdl::Debug('Could not write WSDL to cache');
+			return false;
+		}
+		if(file_put_contents($file.'.cache',time())===false){
+			PhpWsdl::Debug('Could not write cache time');
+			return false;
+		}
+		return true;
+	}
+	
+	/**
+	 * Get the cache filename
+	 * 
+	 * @param string $wsdl The WSDL URI
+	 * @return string The filename or NULL
+	 */
+	public static function GetWsdlCacheFilename($wsdl){
+		if(is_file($wsdl))
+			return null;
+		return (is_null(PhpWsdl::$CacheFolder))?null:PhpWsdl::$CacheFolder.'/ajax-'.sha1($wsdl).'.wsdl';
 	}
 }

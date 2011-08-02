@@ -39,7 +39,7 @@ class PhpWsdlParser{
 	 * 
 	 * @var string
 	 */
-	public static $ParseRelevantRx='/\/\*\*([^\*]*\*+(?:[^\*\/][^\*]*\*+)*)\/(\s*public\s+function\s+([^\s|\(]+)\s*\()?/is';
+	public static $ParseRelevantRx='/\/\*\*([^\*]*\*+(?:[^\*\/][^\*]*\*+)*)\/(\s*(public\s+)?function\s+([^\s|\(]+)\s*\()?/is';
 	/**
 	 * Regular expression to parse keywords from a string
 	 * 1: Whole line

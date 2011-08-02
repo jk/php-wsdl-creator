@@ -20,6 +20,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+// The NuSOAP adapter was developed and tested with NuSOAP version 0.9.5
+
 PhpWsdl::Debug('NuSOAP adapter loaded');
 
 PhpWsdl::RegisterHook('CreateWsdlHeaderHook','nusoap','PhpWsdlNuSOAP::CreateWsdl');

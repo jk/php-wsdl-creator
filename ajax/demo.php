@@ -6,12 +6,18 @@
 //
 // To avoid an open proxy, this demonstration restricts requests only to the server running 
 // this demo.
+//
+// I recommend to enable the PhpWsdl cache when using this proxy.
+
+// Load PhpWsdl (uncomment these two lines of code to enable the PhpWsdl cache in advance)
+//require_once('class.phpwsdl.php');
+//PhpWsdl::$CacheFolder='./cache';// Set this to a writeable location
 
 // Load the webservice class
 require_once('class.phpwsdlajax.php');
 
-// Restrict access to this SOAP webservice location
+// Restrict access to the server that is hosting this demonstration
 PhpWsdlAjax::$Restrict[]=((isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on')?'https':'http').'://'.$_SERVER['SERVER_NAME'];
 
-// Load PhpWsdl and run the SOAP proxy webservice
+// Load PhpWsdl (if not loaded yet) and run the SOAP proxy webservice
 PhpWsdlAjax::Run();
