@@ -22,19 +22,13 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 
 PhpWsdl::RegisterHook('InterpretKeywordparamHook','internal','PhpWsdlParam::InterpretParam');
 PhpWsdl::RegisterHook('InterpretKeywordreturnHook','internal','PhpWsdlParam::InterpretReturn');
-	
+
 /**
  * A parameter or return value definition for a method
  * 
  * @author Andreas Zimmermann, wan24.de
  */
-class PhpWsdlParam{
-	/**
-	 * The parameter name
-	 * 
-	 * @var string
-	 */
-	public $Name;
+class PhpWsdlParam extends PhpWsdlObject{
 	/**
 	 * The parameter type name
 	 * 
@@ -47,6 +41,13 @@ class PhpWsdlParam{
 	 * @var string
 	 */
 	public $Docs=null;
+	/**
+	 * The default name for the return value object
+	 * Use %method% as placeholder for the method name
+	 * 
+	 * @var string
+	 */
+	public static $DefaultReturnName='return';
 	
 	/**
 	 * Constructor
@@ -57,11 +58,8 @@ class PhpWsdlParam{
 	 */
 	public function PhpWsdlParam($name,$type='string',$settings=null){
 		PhpWsdl::Debug('New parameter '.$name);
-		$this->Name=$name;
+		parent::PhpWsdlObject($name,$settings);
 		$this->Type=$type;
-		if(!is_null($settings))
-			if(isset($settings['docs']))
-				$this->Docs=$settings['docs'];
 	}
 	
 	/**
@@ -72,16 +70,55 @@ class PhpWsdlParam{
 	 */
 	public function CreatePart($pw){
 		PhpWsdl::Debug('Create WSDL definition for parameter part '.$this->Name);
-		$res="\t\t".'<wsdl:part name="'.$this->Name.'" type="';
+		$res='<wsdl:part name="'.$this->Name.'" type="';
 		$res.=PhpWsdl::TranslateType($this->Type).'"';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
 			$res.='>'."\n";
-			$res.="\t\t\t".'<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
-			$res.="\t\t".'</wsdl:part>';
+			$res.='<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
+			$res.='</wsdl:part>';
 		}else{
 			$res.=' />';
 		}
 		return $res;
+	}
+	
+	/**
+	 * Create parameter HTML documentation
+	 * 
+	 * @param array $data Some data
+	 */
+	public function CreateParamHtml($data){
+		PhpWsdl::Debug('CreateParamHtml for '.$data['param']->Name);
+		$res=&$data['res'];
+		$p=&$data['param'];
+		if(is_null($p->Docs))
+			return;
+		if(in_array($p->Type,PhpWsdl::$BasicTypes)){
+			$res[]='<li class="pre"><span class="blue">'.$p->Type.'</span> <span class="bold">'.$p->Name.'</span>';
+		}else{
+			$res[]='<li class="pre"><a href="#'.$p->Type.'"><span class="lightBlue">'.$p->Type.'</span></a> <span class="bold">'.$p->Name.'</span>';
+		}
+		$res[sizeof($res)-1].='<br><span class="normal">'.nl2br(htmlentities($p->Docs)).'</span></li>';
+	}
+	
+	/**
+	 * Create return value HTML documentation
+	 * 
+	 * @param array $data Some data
+	 */
+	public function CreateReturnHtml($data){
+		PhpWsdl::Debug('CreateReturnHtml for '.$data['method']->Return->Name);
+		$res=&$data['res'];
+		$m=&$data['method'];
+		$res[]='<p>Return value <span class="pre">';
+		$o=sizeof($res)-1;
+		$type=$m->Return->Type;
+		if(in_array($type,PhpWsdl::$BasicTypes)){
+			$res[$o].='<span class="blue">'.$type.'</span>';
+		}else{
+			$res[$o].='<a href="#'.$type.'"><span class="lightBlue">'.$type.'</span></a>';
+		}
+		$res[$o].='</span>'.((!is_null($m->Return->Docs))?': '.nl2br(htmlentities($m->Return->Docs)):'').'</p>';
 	}
 	
 	/**
@@ -100,8 +137,9 @@ class PhpWsdlParam{
 		if(substr($name,strlen($name)-1,1)==';')
 			$name=substr($name,0,strlen($name)-1);
 		PhpWsdl::Debug('Interpret parameter '.$name);
-		if(sizeof($info)>2)
-			$data['settings']['docs']=trim($info[2]);
+		if($data['server']->ParseDocs)
+			if(sizeof($info)>2)
+				$data['settings']['docs']=trim($info[2]);
 		$data['param'][]=new PhpWsdlParam($name,$info[0],$data['settings']);
 		$data['settings']=Array();
 		return false;
@@ -120,9 +158,10 @@ class PhpWsdlParam{
 		if(sizeof($info)<1)
 			return true;
 		PhpWsdl::Debug('Interpret return');
-		if(sizeof($info)>1)
-			$data['settings']['docs']=trim($info[1]);
-		$data['return']=new PhpWsdlParam($data['method'].'Result',$info[0],$data['settings']);
+		if($data['server']->ParseDocs)
+			if(sizeof($info)>1)
+				$data['settings']['docs']=trim($info[1]);
+		$data['return']=new PhpWsdlParam(str_replace('%method%',$data['method'],self::$DefaultReturnName),$info[0],$data['settings']);
 		$data['settings']=Array();
 		return false;
 	}

@@ -27,14 +27,14 @@ $soap=PhpWsdl::CreateInstance(
 
 // Disable caching for demonstration
 ini_set('soap.wsdl_cache_enabled',0);	// Disable caching in PHP
-$soap->CacheTime=0;						// Disable caching in PhpWsdl
+PhpWsdl::$CacheTime=0;					// Disable caching in PhpWsdl
 
 // Run the SOAP server
-if($soap->IsWsdlRequested())
+if($soap->IsWsdlRequested())			// WSDL requested by the client?
 	$soap->Optimize=false;				// Don't optimize WSDL to send it human readable to the browser
-//$soap->ParseDocs=false;				// Uncomment this line to disable the documentation features
+//$soap->ParseDocs=false;				// Uncomment this line to disable the whole documentation features
+//$soap->IncludeDocs=false;				// Uncomment this line to disable writing the documentation in WSDL XML
+//$wsdl=$soap->CreateWsdl();			// This would save the WSDL XML string in $wsdl
+//$php=$soap->OutputPhp(false,false);	// This would save a PHP SOAP client as PHP source code string in $php
+//$html=$soap->OutputHtml(false,false);	// This would save the HTML documentation string in $html
 $soap->RunServer();						// Finally, run the server
-
-// In an productive environment you may want to set the last parameter of the 
-// PhpWsdl constructor to "true". This will run the server at construction 
-// time with the maybe best performance settings for your application.

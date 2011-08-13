@@ -21,6 +21,8 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
 // The NuSOAP adapter was developed and tested with NuSOAP version 0.9.5
+//
+// Note: The NuSOAP adapter won't work with the PhpWsdlProxy!
 
 PhpWsdl::Debug('NuSOAP adapter loaded');
 
@@ -49,7 +51,7 @@ class PhpWsdlNuSOAP{
 	/**
 	 * The current server object
 	 * 
-	 * @var soap_server
+	 * @var nusoap_server
 	 */
 	public static $Server=null;
 	
@@ -77,16 +79,13 @@ class PhpWsdlNuSOAP{
 	 * @return boolean Response
 	 */
 	public static function PrepareServer($data){
-		self::$Server=null;
 		if(!class_exists('soap_server')){
 			PhpWsdl::Debug('NuSOAP not found');
 			return true;// Use the default PHP SoapServer because NuSOAP is not available
 		}
 		// Initialize the NuSOAP server object
 		$server=$data['server'];
-		if(is_null(self::$Server))
-			self::CreateServer($server);
-		$data['soapserver']=self::CreateServer($server,$data);
+		$data['soapserver']=(is_null(self::$Server))?self::CreateServer($server):self::$Server;
 		return false;
 	}
 		
@@ -103,17 +102,19 @@ class PhpWsdlNuSOAP{
 			return true;// We can't handle this server run!
 		}
 		$req=file_get_contents('php://input');
+		$handled=false;
 		if(!PhpWsdl::CallHook(
 				'NuSOAPRunHook',
 				array_merge(
 					$data,
 					Array(
-						'req'			=>	&$req
+						'req'			=>	&$req,
+						'handled'		=>	&$handled
 					)
 				)
 			)
 		)
-			return false;
+			return $handled;
 		self::$Server->service(utf8_encode($req));
 		return false;
 	}
@@ -134,23 +135,26 @@ class PhpWsdlNuSOAP{
 	 * Create a NuSOAP soap_server object
 	 * 
 	 * @param PhpWsdl $server The PhpWsdl object
-	 * @param array $data Hook data (default: NULL)
-	 * @return soap_server The NuSOAP server object
+	 * @return nusoap_server The NuSOAP server object
 	 */
-	public static function CreateServer($server,$data=null){
+	public static function CreateServer($server){
 		if(!is_null(self::$Server))
 			return self::$Server;
-		self::$Server=new soap_server();
+		// Basic configuration
+		self::$Server=new nusoap_server();
 		self::$Server->debug_flag=false;
 		self::$Server->soap_defencoding='UTF-8';
 		self::$Server->decode_utf8=false;
-		// Basic configuration
-		self::$Server->configureWSDL($server->Name,$server->NameSpace);
+		self::$Server->configureWSDL($server->Name,$server->NameSpace,$server->EndPoint);
 		self::$Server->wsdl->schemaTargetNamespace=$server->NameSpace;
-		PhpWsdl::CallHook(
-			'NuSOAPConfigHook',
-			$data
-		);
+		if(!PhpWsdl::CallHook(
+				'NuSOAPConfigHook',
+				Array(
+					'server'		=>	self::$Server
+				)
+			)
+		)
+			return self::$Server;
 		// Add types
 		$i=-1;
 		$len=sizeof($server->Types);
@@ -236,7 +240,7 @@ class PhpWsdlNuSOAP{
 			}
 			$r=$m->Return;
 			self::$Server->register(
-				$server->Name.'.'.$m->Name,
+				($m->IsGlobal)?$m->Name:$server->Name.'.'.$m->Name,
 				$param,
 				(is_null($r))
 					?Array()
@@ -253,5 +257,119 @@ class PhpWsdlNuSOAP{
 			'NuSOAPMethodsHook',
 			$data
 		);
+		return self::$Server;
+	}
+	
+	/**
+	 * Fill an PhpWsdl object with data from an NuSOAP object
+	 * Development status: Beta
+	 * 
+	 * @param nusoap_server $nusoap NuSOAP server object
+	 * @param PhpWsdl $phpwsdl PhpWsdl object or NULL to create a new one (default: NULL)
+	 * @return PhpWsdl PhpWsdl object
+	 */
+	public static function CreatePhpWsdl($nusoap,$phpwsdl=null){
+		//TODO This has still to be tested with some real NuSOAP webservice objects!
+		PhpWsdl::Debug('Create PhpWsdl from NuSOAP');
+		if(is_null($phpwsdl))
+			$phpwsdl=PhpWsdl::CreateInstance();
+		// Basic configuration
+		$phpwsdl->Name=$nusoap->wsdl->serviceName;
+		$phpwsdl->EndPoint=$nusoap->wsdl->endpoint;
+		$phpwsdl->NameSpace=$nusoap->wsdl->namespaces['tns'];
+		// Types
+		PhpWsdl::Debug('Add types');
+		$ntl=$nusoap->wsdl->schemas[$phpwsdl->NameSpace][0]->complexTypes;
+		$keys=array_keys($ntl);
+		$i=-1;
+		$len=sizeof($keys);
+		while(++$i<$len){
+			$nt=$ntl[$keys[$i]];
+			$name=$nt['name'];
+			PhpWsdl::Debug('Add type '.$name);
+			if($nt['typeClass']!='complexType'){
+				PhpWsdl::Debug('WARNING: Not a complex type');
+				continue;
+			}
+			if(!is_null($phpwsdl->GetType($name))){
+				PhpWsdl::Debug('WARNING: Double type detected!');
+				continue;
+			}
+			if($nt['phpType']=='array'){
+				// Array
+				PhpWsdl::Debug('Array type');
+				list($temp,$type)=explode(':',$nt['arrayType'],2);
+				$t=new PhpWsdlComplex($name);
+				$t->Type=$type;
+				$t->IsArray=true;
+				$phpwsdl->Types[]=$t;
+			}else{
+				// Complex type
+				PhpWsdl::Debug('Complex type');
+				if(PhpWsdl::$Debugging){
+					if($nt['phpType']!='struct')
+						PhpWsdl::Debug('WARNING: Not a struct');
+					if($nt['compositor']!='sequence')
+						PhpWsdl::Debug('WARNING: Not sequenced elements');
+				}
+				$el=Array();
+				$ek=array_keys($nt['elements']);
+				$j=-1;
+				$eLen=sizeof($ek);
+				while(++$j<$eLen){
+					$n=$nt['elements'][$ek[$j]]['name'];
+					list($temp,$type)=explode(':',$nt['elements'][$ek[$j]]['type']);
+					PhpWsdl::Debug('Found element '.$n.' type of '.$type);
+					$el[]=new PhpWsdlElement($n,$type);
+				}
+				$phpwsdl->Types[]=new PhpWsdlComplex($name,$el);
+			}
+		}
+		// Methods
+		PhpWsdl::Debug('Add methods');
+		$nml=$nusoap->operations;
+		$keys=array_keys($nml);
+		$i=-1;
+		$len=sizeof($keys);
+		while(++$i<$len){
+			$nm=$nml[$keys[$i]];
+			// Get the method name
+			$name=$nml['name'];
+			PhpWsdl::Debug('Add method '.$name);
+			$glob=strpos($name,'.')<0;
+			if(!$glob){
+				list($temp,$name)=explode('.',$name,2);
+				PhpWsdl::Debug('Class method '.$name);
+			}else{
+				PhpWsdl::Debug('Global method');
+			}
+			if(!is_null($phpwsdl->GetMethod($name))){
+				PhpWsdl::Debug('WARNING: Double method detected!');
+				continue;
+			}
+			// Get parameters
+			$param=Array();
+			$pk=array_keys($nm['in']);
+			$j=-1;
+			$pLen=sizeof($pk);
+			while(++$j<$pLen){
+				list($temp,$type)=explode(':',$nm['in'][$pk[$j]],2);
+				PhpWsdl::Debug('Parameter '.$ok[$j].' type of '.$type);
+				$param[]=new PhpWsdlParam($pk[$j],$type);
+			}
+			// Get return type
+			$r=null;
+			if(sizeof($nm['out'])>0){
+				$pk=array_keys($nm['in']);
+				list($temp,$type)=explode(':',$nm['out'][$pk[0]],2);
+				PhpWsdl::Debug('Return '.$pk[0].' type of '.$type);
+				$r=new PhpWsdlParam($pk[0],$type);
+			}
+			// Create method
+			$m=new PhpWsdlMethod($name,$param,$r);
+			$m->IsGlobal=$glob;
+			$phpwsdl->Methods[]=$m;
+		}
+		return $phpwsdl;
 	}
 }

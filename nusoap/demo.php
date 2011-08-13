@@ -2,6 +2,8 @@
 
 // This demonstrates the usage of the NuSOAP adapter. It requires the 
 // PhpWsdl framework files to be in the same folder as this file.
+//
+// Note: The NuSOAP adapter won't work with the PhpWsdlProxy!
 
 // Load NoSOAP
 require_once('nusoap.php');// Change this to the location of your NuSOAP installation
@@ -16,13 +18,11 @@ if(!class_exists('PhpWsdlNuSOAP'))
 	require_once('class.phpwsdl.nusoap.php');
 
 // Run the SOAP server in quick mode
-$soap=PhpWsdl::CreateInstance(
-	true,								// PhpWsdl will determine a good namespace
+$soap=PhpWsdl::RunQuickMode(
 	Array(								// All files with WSDL definitions in comments
 		'class.soapdemo.php',
 		'class.complextypedemo.php'
-	),
-	'./cache'							// Change this to a folder with write access
+	)
 );
 
 // I was able to use this webservice with SoapUI. But with Visual Studio 2010 
@@ -32,4 +32,5 @@ $soap=PhpWsdl::CreateInstance(
 // is no way to change the class->method delimiter in NuSOAP (or you need to 
 // touch their code). So I'm sorry, but this may not work with .NET clients...
 //
-// By the way: NuSOAP has a horrible UTF-8 support.
+// A solution for this problem would be to use only global methods. Then 
+// Visual Studio would be able to consume the webservice.

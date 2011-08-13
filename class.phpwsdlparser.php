@@ -35,7 +35,7 @@ class PhpWsdlParser{
 	/**
 	 * Regular expression to parse the relevant data from a string
 	 * 1: Comment block
-	 * 3: Method name
+	 * 4: Method name
 	 * 
 	 * @var string
 	 */
@@ -48,14 +48,14 @@ class PhpWsdlParser{
 	 * 
 	 * @var string
 	 */
-	public static $ParseKeywordsRx='/^(\s*\*\s*\@([^\s|\n]+)([^\n]*))$/im';
+	public static $ParseKeywordsRx='/^(\s*\*\s*\@([^\s|\n]+)([^\n]*))$/m';
 	/**
 	 * Regular expression to parse the documentation from the bottom of a comment block string
 	 * 1: Documentation
 	 * 
 	 * @var string
 	 */
-	public static $ParseDocsRx='/^[^\*|\n]*\*[ |\t]+([^\*|\s|\@|\/|\n][^\n]*)?$/im';
+	public static $ParseDocsRx='/^[^\*|\n]*\*[ |\t]+([^\*|\s|\@|\/|\n][^\n]*)?$/m';
 	
 	/**
 	 * Constructor
@@ -92,7 +92,9 @@ class PhpWsdlParser{
 		PhpWsdl::Debug('Matched '.$len.' relevant strings to parse');
 		while(++$i<$len){
 			$def=$defs[1][$i];
-			$method=$defs[3][$i];
+			$method=$defs[4][$i];
+			if($method!='')
+				PhpWsdl::Debug('Method: "'.$method.'"');
 			// Parse keywords
 			$keywords=Array();
 			$temp=Array();
@@ -118,8 +120,8 @@ class PhpWsdlParser{
 				$docs=trim(implode("\n",$docs));
 				if($docs=='')
 					$docs=null;
-				if(PhpWsdl::$Debugging)
-					PhpWsdl::Debug('Docs: '.print_r($docs,true));
+				if(!is_null($docs))
+					PhpWsdl::Debug('Docs: '.$docs);
 			}else{
 				$docs=null;
 			}

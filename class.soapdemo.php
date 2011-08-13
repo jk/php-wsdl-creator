@@ -3,6 +3,11 @@
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+/**
+ * This demo webservice shows you how to work with PhpWsdl
+ * 
+ * @service SoapDemo
+ */
 class SoapDemo{
 	/**
 	 * Get a complex type object
@@ -48,7 +53,7 @@ class SoapDemo{
 		$name=utf8_decode($name);// Because a string parameter is UTF-8 encoded...
 		if($name=='')
 			$name='unknown';
-		return utf8_encode('Hello '.$name.'!');
+		return utf8_encode('Hello '.$name.'!');// Because a string return value should by UTF-8 encoded...
 	}
 
 	/**

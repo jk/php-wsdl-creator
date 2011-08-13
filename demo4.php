@@ -2,17 +2,14 @@
 
 // A quick and dirty SOAP server example
 
-// TRUE as first parameter enables the quick mode. In quick mode you can 
-// specify the class filename(s) of your webservice as second parameter, if 
-// required. This together means that the SOAP namespace and the endpoint 
-// can't be defined in the PhpWsdl constructor when using the quick mode.
-// Note that not setting a cache folder may lead to warnings, if the system 
-// temporary directory is not writeable for your script in the webservers 
-// request context.
+ini_set('soap.wsdl_cache_enabled',0);	// Disable caching in PHP
+$PhpWsdlAutoRun=true;					// With this global variable PhpWsdl will autorun in quick mode, too
 require_once('class.phpwsdl.php');
-PhpWsdl::CreateInstance(true);// -> Don't waste my time - just run!
 
-// This is the SOAP webservice handler demo class
+// In quick mode you can specify the class filename(s) of your webservice 
+// optional parameter, if required.
+//PhpWsdl::RunQuickMode();// -> Don't waste my time - just run!
+
 class SoapDemo{
 	/**
 	 * Say hello to...

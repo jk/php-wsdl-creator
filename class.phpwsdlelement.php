@@ -43,15 +43,9 @@ class PhpWsdlElement extends PhpWsdlParam{
 	/**
 	 * Maximum number of elements
 	 * 
-	 * @var int
+	 * @var int|string
 	 */
 	public $MaxOccurs=1;
-	/**
-	 * Documentation
-	 * 
-	 * @var string
-	 */
-	public $Docs=null;
 	
 	/**
 	 * Constructor
@@ -61,8 +55,9 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 * @param array $settings Optional the settings hash array (default: NULL)
 	 */
 	public function PhpWsdlElement($name,$type,$settings=null){
-		PhpWsdl::Debug('New element '.$name);
-		parent::PhpWsdlParam($name,$type);
+		PhpWsdl::Debug('New complex type element '.$name);
+		parent::PhpWsdlParam($name,$type,$settings);
+		$this->NillAble=!in_array($type,PhpWsdl::$NonNillable);
 		if(!is_null($settings)){
 			if(isset($settings['nillable']))
 				$this->NillAble=$settings['nillable']=='1'||$settings['nillable']=='true';
@@ -70,8 +65,6 @@ class PhpWsdlElement extends PhpWsdlParam{
 				$this->MinOccurs=$settings['minoccurs'];
 			if(isset($settings['maxoccurs']))
 				$this->MaxOccurs=$settings['maxoccurs'];
-			if(isset($settings['docs']))
-				$this->Docs=$settings['docs'];
 		}
 	}
 	
@@ -83,18 +76,44 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 */
 	public function CreateElement($pw){
 		PhpWsdl::Debug('Create WSDL definition for element '.$this->Name);
-		$res="\t\t\t\t\t".'<s:element minOccurs="'.$this->MinOccurs.'" maxOccurs="'.$this->MaxOccurs.'" nillable="'.(($this->NillAble)?'true':'false').'" name="'.$this->Name.'" type="';
+		$res='<s:element minOccurs="'.$this->MinOccurs.'" maxOccurs="'.$this->MaxOccurs.'" nillable="'.(($this->NillAble)?'true':'false').'" name="'.$this->Name.'" type="';
 		$res.=PhpWsdl::TranslateType($this->Type).'"';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs)){
 			$res.='>'."\n";
-			$res.="\t\t\t\t\t\t".'<s:annotation>'."\n";
-			$res.="\t\t\t\t\t\t\t".'<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
-			$res.="\t\t\t\t\t\t".'</s:annotation>'."\n";
-			$res.="\t\t\t\t\t".'</s:element>';
+			$res.='<s:annotation>'."\n";
+			$res.='<s:documentation><![CDATA['.$this->Docs.']]></s:documentation>'."\n";
+			$res.='</s:annotation>'."\n";
+			$res.='</s:element>';
 		}else{
 			$res.=' />';
 		}
 		return $res;
+	}
+	
+	/**
+	 * Create the HTML documentation for a complex type element
+	 * 
+	 * @param array $data
+	 */
+	public function CreateElementHtml($data){
+		PhpWsdl::Debug('CreateElementHtml for '.$data['element']->Name);
+		$res=&$data['res'];
+		$e=&$data['element'];
+		if(in_array($e->Type,PhpWsdl::$BasicTypes)){
+			$res[]='<li><span class="blue">'.$e->Type.'</span> <span class="bold">'.$e->Name.'</span>';
+		}else{
+			$res[]='<li><a href="#'.$e->Type.'"><span class="lightBlue">'.$e->Type.'</span></a> <span class="bold">'.$e->Name.'</span>';
+		}
+		$o=sizeof($res)-1;
+		$temp=Array(
+			'nillable = <span class="blue">'.(($e->NillAble)?'true':'false').'</span>',
+			'minoccurs = <span class="blue">'.$e->MinOccurs.'</span>',
+			'maxoccurs = <span class="blue">'.$e->MaxOccurs.'</span>',
+		);
+		$res[$o].=' ('.implode(', ',$temp).')';
+		if(!is_null($e->Docs))
+			$res[$o].='<br><span class="normal">'.nl2br(htmlentities($e->Docs)).'</span>';
+		$res[$o].='</li>';
 	}
 	
 	/**
@@ -111,8 +130,9 @@ class PhpWsdlElement extends PhpWsdlParam{
 		if(substr($name,strlen($name)-1,1)==';')
 			$name=substr($name,0,strlen($name)-1);
 		PhpWsdl::Debug('Interpret element '.$name);
-		if(sizeof($info)>2)
-			$data['settings']['docs']=trim($info[2]);
+		if($data['server']->ParseDocs)
+			if(sizeof($info)>2)
+				$data['settings']['docs']=trim($info[2]);
 		$data['elements'][]=new PhpWsdlElement($name,$info[0],$data['settings']);
 		$data['settings']=Array();
 		return false;

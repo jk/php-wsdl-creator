@@ -20,8 +20,12 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
+// Debugging
+/*PhpWsdl::$Debugging=true;// Enable debugging
+PhpWsdl::$DebugFile='./cache/debug.log';// The logfile to write the debugging messages to
+PhpWsdl::$DebugBackTrace=false;// Include backtrace information in debugging messages?*/
+
 // Initialize PhpWsdl
-//PhpWsdl::$Debugging=true;// Uncomment this line to enable debugging
 PhpWsdl::Init();
 	
 // You don't require class.phpwsdlelement.php and class.phpwsdlcomplex.php, 
@@ -29,21 +33,38 @@ PhpWsdl::Init();
 // requires out.
 // You may also disable loading the class.phpwsdlproxy.php, if you don't plan 
 // to use the proxy class for your webservice.
+require_once(dirname(__FILE__).'/class.phpwsdlformatter.php');
+require_once(dirname(__FILE__).'/class.phpwsdlobject.php');
+require_once(dirname(__FILE__).'/class.phpwsdlparser.php');
+require_once(dirname(__FILE__).'/class.phpwsdlproxy.php');
 require_once(dirname(__FILE__).'/class.phpwsdlparam.php');
 require_once(dirname(__FILE__).'/class.phpwsdlmethod.php');
 require_once(dirname(__FILE__).'/class.phpwsdlelement.php');
 require_once(dirname(__FILE__).'/class.phpwsdlcomplex.php');
-require_once(dirname(__FILE__).'/class.phpwsdlproxy.php');
-require_once(dirname(__FILE__).'/class.phpwsdlparser.php');
+
+// Do things after the environment is configured
+PhpWsdl::PostInit();
 
 /**
  * PhpWsdl class
  * 
  * @author Andreas Zimmermann
  * @copyright ©2011 Andreas Zimmermann, wan24.de
- * @version 2.1.1
+ * @version 2.2
  */
 class PhpWsdl{
+	/**
+	 * The version number 
+	 * 
+	 * @var string
+	 */
+	public static $VERSION='2.2';
+	/**
+	 * Set this to TRUE to enable the autorun in quick mode
+	 * 
+	 * @var boolean
+	 */
+	public static $AutoRun=false;
 	/**
 	 * Global static configuration
 	 * 
@@ -63,17 +84,29 @@ class PhpWsdl{
 	 */
 	public static $ProxyServer=null;
 	/**
+	 * Use WSDL with the proxy
+	 * 
+	 * @var boolean
+	 */
+	public static $UseProxyWsdl=false;
+	/**
+	 * The name
+	 * 
+	 * @var string
+	 */
+	public $Name;
+	/**
+	 * Documentation
+	 * 
+	 * @var string
+	 */
+	public $Docs=null;
+	/**
 	 * The namespace
 	 * 
 	 * @var string
 	 */
 	public $NameSpace=null;
-	/**
-	 * The name of the webservice
-	 * 
-	 * @var string
-	 */
-	public $Name=null;
 	/**
 	 * The SOAP endpoint URI
 	 * 
@@ -86,6 +119,12 @@ class PhpWsdl{
 	 * @var string
 	 */
 	public $WsdlUri=null;
+	/**
+	 * Set this to the PHP URI, if it's different from your SOAP endpoint + "?PHPSOAPCLIENT"
+	 * 
+	 * @var string
+	 */
+	public $PhpUri=null;
 	/**
 	 * Set this to the HTML documentation URI, if it's different from your SOAP endpoint
 	 * 
@@ -131,6 +170,18 @@ class PhpWsdl{
 	 */
 	public $WSDL=null;
 	/**
+	 * UTF-8 encoded HTML from the last OutputHtml method call
+	 * 
+	 * @var string
+	 */
+	public $HTML=null;
+	/**
+	 * UTF-8 encoded PHP from the last OutputPhp method call
+	 * 
+	 * @var string
+	 */
+	public $PHP=null;
+	/**
 	 * An array of basic types (these are just some of the XSD defined types 
 	 * (see http://www.w3.org/TR/2001/PR-xmlschema-2-20010330/)
 	 * 
@@ -164,20 +215,48 @@ class PhpWsdl{
 		'time'
 	);
 	/**
+	 * A list of non-nillable types
+	 * 
+	 * @var string[]
+	 */
+	public static $NonNillable=Array(
+		'boolean',
+		'decimal',
+		'double',
+		'float',
+		'int',
+		'integer',
+		'long',
+		'number',
+		'short'
+	);
+	/**
 	 * Set this to a writeable folder to enable caching the WSDL in files
 	 * 
 	 * @var string
 	 */
 	public static $CacheFolder=null;
 	/**
+	 * Is the cache folder writeable?
+	 * 
+	 * @var boolean|NULL
+	 */
+	public static $CacheFolderWriteAble=null;
+	/**
 	 * The cache timeout in seconds (set to zero to disable caching, too)
 	 * If you set the value to -1, the cache will never expire. Then you have 
 	 * to use the PhpWsdl->TidyCache method for cleaning up the cache once 
-	 * you've made changes to your webservice handler class.
+	 * you've made changes to your webservice.
 	 * 
 	 * @var int
 	 */
 	public static $CacheTime=3600;
+	/**
+	 * Write even unoptimized and/or documented XML to the cache?
+	 * 
+	 * @var boolean
+	 */
+	public static $CacheAllWsdl=false;
 	/**
 	 * Parse documentation?
 	 * 
@@ -215,11 +294,23 @@ class PhpWsdl{
 	 */
 	public $ForceNotOutputHtml=false;
 	/**
+	 * Force sending PHP (has a higher priority than PhpWsdl->ForceNotOutputPhp)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceOutputPhp=false;
+	/**
+	 * Force NOT sending PHP (disable sending PHP)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceNotOutputPhp=false;
+	/**
 	 * Regular expression parse a class name
 	 * 
 	 * @var string
 	 */
-	public $classRx='/^.*class\s+([^\s]+)\s*\{.*$/is';
+	public static $classRx='/^.*class\s+([^\s]+)\s*\{.*$/is';
 	/**
 	 * The HTML2PDF license key (see www.htmltopdf.de)
 	 * 
@@ -257,6 +348,12 @@ class PhpWsdl{
 	 */
 	public $SoapServer=null;
 	/**
+	 * Is a http Auth login required to run the SOAP server?
+	 * 
+	 * @var boolean
+	 */
+	public $RequireLogin=false;
+	/**
 	 * Debugging messages
 	 * 
 	 * @var string[]
@@ -275,6 +372,12 @@ class PhpWsdl{
 	 */
 	public static $DebugFile=null;
 	/**
+	 * Put backtrace information in debugging messages
+	 * 
+	 * @var boolean
+	 */
+	public static $DebugBackTrace=false;
+	/**
 	 * WSDL namespaces
 	 * 
 	 * @var array
@@ -283,6 +386,8 @@ class PhpWsdl{
 	
 	/**
 	 * PhpWsdl constructor
+	 * Note: The quick mode by giving TRUE as first parameter is deprecated and will be removed from version 3.0.
+	 * Use PhpWsdl::RunQuickMode() instead
 	 * 
 	 * @param string|boolean $nameSpace Namespace or NULL to let PhpWsdl determine it, or TRUE to run everything by determining all configuration -> quick mode (default: NULL)
 	 * @param string|string[] $endPoint Endpoint URI or NULL to let PhpWsdl determine it - or, in quick mode, the webservice class filename(s) (default: NULL)
@@ -312,10 +417,9 @@ class PhpWsdl{
 			self::Debug('Quick mode detected');
 			$quickRun=true;
 			$nameSpace=null;
-			if(!is_null($endPoint)&&is_null($file)){
+			if(!is_null($endPoint)){
 				if(self::$Debugging)
 					self::Debug('Filename(s): '.print_r($endPoint,true));
-				$file=$endPoint;
 				$endPoint=null;
 			}
 		}
@@ -334,21 +438,21 @@ class PhpWsdl{
 			self::$CacheFolder=$cacheFolder;
 		}
 		// Namespace
-		$this->NameSpace=(is_null($nameSpace))?'http://'.$_SERVER['SERVER_NAME'].str_replace(basename($_SERVER['SCRIPT_NAME']),'',$_SERVER['SCRIPT_NAME']):$nameSpace;
+		$this->NameSpace=(is_null($nameSpace))?$this->DetermineNameSpace():$nameSpace;
 		self::Debug('Namespace is '.$this->NameSpace);
-		// Webservice handler class name
+		// Endpoint
+		$this->EndPoint=((!is_null($endPoint)))?$endPoint:$this->DetermineEndPoint();
+		self::Debug('Endpoint is '.$this->EndPoint);
+		// Name
 		if(!is_null($name)){
 			self::Debug('Name is '.$name);
 			$this->Name=$name;
 		}
-		// Endpoint
-		$this->EndPoint=((!is_null($endPoint)))?$endPoint:((isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on')?'https':'http').'://'.$_SERVER['SERVER_NAME'].$_SERVER['SCRIPT_NAME'];
-		self::Debug('Endpoint is '.$this->EndPoint);
 		// Source files
 		if(!is_null($file)){
 			if(self::$Debugging)
 				self::Debug('Filename(s): '.print_r($file,true));
-			$this->Files=(is_array($file))?$file:Array($file);
+			$this->Files=array_merge($this->Files,(is_array($file))?$file:Array($file));
 		}
 		// Methods
 		$this->Methods=(!is_null($methods))?$methods:Array();
@@ -378,6 +482,8 @@ class PhpWsdl{
 	
 	/**
 	 * Create an instance of PhpWsdl
+	 * Note: The quick mode by giving TRUE as first parameter is deprecated and will be removed from version 3.0.
+	 * Use PhpWsdl::RunQuickMode() instead
 	 * 
 	 * @param string|boolean $nameSpace Namespace or NULL to let PhpWsdl determine it, or TRUE to run everything by determining all configuration -> quick mode (default: NULL)
 	 * @param string|string[] $endPoint Endpoint URI or NULL to let PhpWsdl determine it - or, in quick mode, the webservice class filename(s) (default: NULL)
@@ -413,6 +519,19 @@ class PhpWsdl{
 	}
 	
 	/**
+	 * Run the PhpWsdl SOAP server in quick mode
+	 * 
+	 * @param string|string[] $file The webservice handler class file or a list of files or NULL (default: NULL)
+	 */
+	public static function RunQuickMode($file=null){
+		self::Debug('Run quick mode');
+		$server=self::CreateInstance();
+		if(!is_null($file))
+			$server->Files=(is_array($file))?$file:Array($file);
+		$server->RunServer();
+	}
+	
+	/**
 	 * Determine if WSDL was requested by the client
 	 * 
 	 * @return boolean WSDL requested?
@@ -429,6 +548,41 @@ class PhpWsdl{
 	public function IsHtmlRequested(){
 		return $this->ForceOutputHtml||(strlen(file_get_contents('php://input'))<1&&!$this->ForceNotOutputHtml);
 	}
+
+	/**
+	 * Determine if PHP was requested by the client
+	 * 
+	 * @return boolean PHP requested?
+	 */
+	public function IsPhpRequested(){
+		return $this->ForceOutputPhp||((isset($_GET['phpsoapclient'])||isset($_GET['PHPSOAPCLIENT']))&&!$this->ForceNotOutputPhp);
+	}
+
+	/**
+	 * Determine if this request is a SOAP request
+	 * 
+	 * @return boolean
+	 */
+	public function IsSoapRequest(){
+		return !$this->IsHtmlRequested()&&!$this->IsWsdlRequested()&&!$this->IsPhpRequested();
+	}
+
+	/**
+	 * Determine if only global methods are served
+	 * 
+	 * @return boolean Only global methods?
+	 */
+	public function IsOnlyGlobal(){
+		$res=true;
+		$i=-1;
+		$len=sizeof($this->Methods);
+		while(++$i<$len)
+			if(!$this->Methods[$i]->IsGlobal){
+				$res=false;
+				break;
+			}
+		return $res;
+	}
 	
 	/**
 	 * Disble caching
@@ -436,7 +590,7 @@ class PhpWsdl{
 	 * @param bool $allCaching Do not only set the timeout to zero? (default: TRUE)
 	 */
 	public static function DisableCache($allCaching=true){
-		self::Debug('Disable '.(($all)?'all':'this').' caching');
+		self::Debug('Disable '.(($allCaching)?'all':'this').' caching');
 		if($allCaching)
 			self::$CacheFolder=null;
 		if(!$allCaching)
@@ -450,11 +604,20 @@ class PhpWsdl{
 	 * @param int $timeout The caching timeout in seconds or NULL to use the previous value or the default (3600) (default: NULL)
 	 */
 	public static function EnableCache($folder=null,$timeout=null){
-		if(is_null($folder))
-			$folder=sys_get_temp_dir();
+		if(is_null($folder)){
+			if(self::IsCacheFolderWriteAble('./cache')){
+				$folder='./cache';
+			}else if(self::IsCacheFolderWriteAble(dirname(__FILE__).'/cache')){
+				$folder=dirname(__FILE__).'/cache';
+			}else if(self::IsCacheFolderWriteAble(sys_get_temp_dir())){
+				$folder=sys_get_temp_dir();
+			}else{
+				self::Debug('Could not find a cache folder');
+			}
+		}
 		if(is_null($timeout))
-			$timeout=(self::$CacheTime>0)?self::$CacheTime:3600;
-		self::Debug('Enable cache in folder '.$folder.' with timeout '.$timeout.' seconds');
+			$timeout=(self::$CacheTime!=0)?self::$CacheTime:3600;
+		self::Debug('Enable cache in folder "'.((is_null($folder))?'(none)':$folder).'" with timeout '.$timeout.' seconds');
 		self::$CacheFolder=$folder;
 		self::$CacheTime=$timeout;
 	}
@@ -465,6 +628,8 @@ class PhpWsdl{
 	 * @return boolean Succeed?
 	 */
 	public function DetermineConfiguration(){
+		if(!is_null($this->GetWsdlFromCache()))
+			return true;
 		$this->ParseSource();
 		$mLen=sizeof($this->Methods);
 		$tLen=sizeof($this->Types);
@@ -473,100 +638,120 @@ class PhpWsdl{
 			return ($mLen>0||$tLen>0)&&!is_null($this->Name);
 		self::Debug('Determine configuration');
 		$this->ConfigurationDetermined=true;
-		$tryWebService=file_exists('class.webservice.php');
-		if($tryWebService){
-			$i=-1;
-			while(++$i<$fLen)
-				if(preg_match('/^(.*\/)?class\.webservice\.php$/i',$this->Files[$i])){
-					$tryWebService=false;
-					break;
-				}
-		}
+		$tryWebService=
+			!$this->IsFileInList('class.webservice.php')&&
+			(
+				file_exists('class.webservice.php')||
+				file_exists(dirname(__FILE__).'/class.webservice.php')
+			);
 		// No methods or types? Try to parse them from the current script
 		if($mLen<1&&$tLen<1){
-			self::Debug('Try to load methods and types from the current PHP script '.$_SERVER['SCRIPT_FILENAME']);
-			$this->ParseSource(false,file_get_contents($_SERVER['SCRIPT_FILENAME']));
-			$mLen=sizeof($this->Methods);
-			$tLen=sizeof($this->Types);
-			// Try to load from class.webservice.php
-			if($mLen<1&&$tLen<1&&$tryWebService){
-				self::Debug('Try loading class.webservice.php');
-				$this->ParseSource(false,file_get_contents('class.webservice.php'));
+			$tryFiles=Array();
+			if($tryWebService){
+				if(file_exists('class.webservice.php'))
+					$tryFiles[]='class.webservice.php';
+				if(file_exists(dirname(__FILE__).'/class.webservice.php'))
+					$tryFiles[]=dirname(__FILE__).'/class.webservice.php';
+			}
+			if(!$this->IsFileInList($_SERVER['SCRIPT_FILENAME']))
+				$tryFiles[]=$_SERVER['SCRIPT_FILENAME'];
+			$i=-1;
+			$len=sizeof($tryFiles);
+			while(++$i<$len){
+				$file=$tryFiles[$i];
+				self::Debug('Try to load objects from '.$file);
+				$this->ParseSource(false,file_get_contents($file));
 				$mLen=sizeof($this->Methods);
 				$tLen=sizeof($this->Types);
-				if($mLen<1&&$tLen<1){
-					self::Debug('Loading class.webservice.php had no effect');
-					unset($this->Files[$fLen-1]);
-					$fLen--;
-					return false;
-				}else{
-					$this->Files[]='class.webservice.php';
-					$fLen++;
-					$tryWebService=false;
-				}
-			}else if($mLen<1&&$tLen<1){
-				self::Debug('Loading current file had no effect');
-				unset($this->Files[$fLen-1]);
-				$fLen--;
-				return false;
-			}else{
-				$this->Files[]=$_SERVER['SCRIPT_FILENAME'];
-				$fLen++;
-			}
-		}
-		// No class name? Try to parse one from the current files
-		if(is_null($this->Name)){
-			self::Debug('Try to determine the class name from known files');
-			$class=null;
-			$i=-1;
-			while(++$i<$fLen){
-				$temp=file_get_contents($this->Files[$i]);
-				if(!preg_match($this->classRx,$temp))
+				if($mLen<1&&$tLen<1)
 					continue;
-				$class=preg_replace($this->classRx,"$1",$temp);
-				self::Debug('Found class name '.$class);
+				self::Debug('Found objects, adding the file to list');
+				$this->Files[]=$file;
+				$fLen++;
 				break;
 			}
-			// Try to load from the current file
-			if(is_null($class)){
-				self::Debug('Try to determine the class name from the current script '.$_SERVER['SCRIPT_FILENAME']);
-				$temp=file_get_contents($_SERVER['SCRIPT_FILENAME']);
-				if(preg_match($this->classRx,$temp)){
-					$class=preg_replace($this->classRx,$temp);
-					self::Debug('Found class name '.$class);
-				}
-				// Try to load from class.webservice.php
-				if($tryWebService&&is_null($class)){
-					self::Debug('Try to determine the class name from class.webservice.php');
-					$temp=file_get_contents('class.webservice.php');
-					if(preg_match($this->classRx,$temp)){
-						$class=preg_replace($this->classRx,$temp);
-						self::Debug('Found class name '.$class);
-					}
-				}
-			}
-			$this->Name=$class;
-			return !is_null($class);
+			if($mLen<1&&$tLen<1)
+				return false;
 		}
-		return true;
+		// No class name? Try to parse one from the current files
+		if(!is_null($this->Name))
+			return true;
+		$tryFiles=Array();
+		if(!$this->IsFileInList($_SERVER['SCRIPT_FILENAME']))
+			$tryFiles[]=$_SERVER['SCRIPT_FILENAME'];
+		if($tryWebService){
+			if(file_exists('class.webservice.php'))
+				$tryFiles[]='class.webservice.php';
+			if(file_exists(dirname(__FILE__).'/class.webservice.php'))
+				$tryFiles[]=dirname(__FILE__).'/class.webservice.php';
+		}
+		$tryFiles=array_merge($this->Files,$tryFiles);
+		$i=-1;
+		$len=sizeof($tryFiles);
+		while(++$i<$len){
+			$file=$tryFiles[$i];
+			self::Debug('Try to determine the class name from '.$file);
+			$temp=file_get_contents($file);
+			if(!preg_match(self::$classRx,$temp))
+				continue;
+			$class=preg_replace(self::$classRx,"$1",$temp);
+			self::Debug('Found class name '.$class);
+			break;
+		}
+		// No class name yet? Use the default if only global methods are present
+		if(is_null($class)&&$this->IsOnlyGlobal()){
+			self::Debug('Using default webservice name');
+			$class='SoapWebService';
+		}
+		$this->Name=$class;
+		return !is_null($class);
+	}
+	
+	/**
+	 * Determine the endpoint URI
+	 */
+	public function DetermineEndPoint(){
+		return ((isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on')?'https':'http').'://'.$_SERVER['SERVER_NAME'].$_SERVER['SCRIPT_NAME'];
+	}
+
+	/**
+	 * Determine the namespace
+	 */
+	public function DetermineNameSpace(){
+		return 'http://'.$_SERVER['SERVER_NAME'].str_replace(basename($_SERVER['SCRIPT_NAME']),'',$_SERVER['SCRIPT_NAME']);
+	}
+	
+	/**
+	 * Determine if a file is included in the list of files
+	 * 
+	 * @param string $file The filename
+	 * @return boolean In the list?
+	 */
+	public function IsFileInList($file){
+		$file=preg_quote(basename($file));
+		$i=-1;
+		while(++$i<$fLen)
+			if(preg_match('/^(.*\/)?'.$file.'$/i',$this->Files[$i]))
+				return true;
+		return false;
 	}
 	
 	/**
 	 * Create the WSDL
 	 * 
 	 * @param boolean $reCreate Don't use the cached WSDL? (default: FALSE)
-	 * @param boolean $optimize If TRUE, override the Optimizer property and force optimizing (default: FALSE)
+	 * @param boolean $optimize If TRUE, override the PhpWsdl->Optimizer property and force optimizing (default: FALSE)
 	 * @return string The UTF-8 encoded WSDL as string
 	 */
 	public function CreateWsdl($reCreate=false,$optimizer=false){
 		self::Debug('Create WSDL');
 		// Ask the cache
-		if(!$reCreate&&($this->Optimize||$optimizer)){
+		if(!$reCreate&&(self::$CacheAllWsdl||!$this->IncludeDocs||$optimizer||$this->Optimize)){
 			self::Debug('Try to get WSDL from the cache');
 			$wsdl=$this->GetWsdlFromCache();
 			if(!is_null($wsdl)){
 				self::Debug('Using cached WSDL');
-				return $wsdl;
+				return (!$optimizer&&!$this->Optimize)?self::FormatXml($wsdl):$wsdl;
 			}
 		}
 		// Prepare the WSDL generator
@@ -656,9 +841,21 @@ class PhpWsdl{
 			)
 		);
 		// Fill the cache
-		if($optimizer||$this->Optimize){
+		if(self::$CacheAllWsdl||!$this->IncludeDocs||$optimizer||$this->Optimize){
 			self::Debug('Cache created WSDL');
-			$this->WriteWsdlToCache($res);
+			$this->WriteWsdlToCache(
+				(
+					!self::$CacheAllWsdl&&
+					!$optimizer&&
+					!$this->Optimize
+				)
+					?self::OptimizeXml($res)
+					:$res
+				,
+				null,
+				null,
+				true
+			);
 		}
 		return $this->WSDL;
 	}
@@ -696,8 +893,8 @@ class PhpWsdl{
 		$server=$data['server'];
 		$tLen=sizeof($server->Types);
 		if($tLen>0){
-			$res[]="\t".'<wsdl:types>';
-			$res[]="\t\t".'<s:schema elementFormDefault="qualified" targetNamespace="'.$server->NameSpace.'">';
+			$res[]='<wsdl:types>';
+			$res[]='<s:schema targetNamespace="'.$server->NameSpace.'">';
 			$i=-1;
 			while(++$i<$tLen)
 				$res[]=$server->Types[$i]->CreateType($server);
@@ -705,8 +902,8 @@ class PhpWsdl{
 				'CreateWsdlTypesHook',
 				$data
 			);
-			$res[]="\t\t".'</s:schema>';
-			$res[]="\t".'</wsdl:types>';
+			$res[]='</s:schema>';
+			$res[]='</wsdl:types>';
 		}
 		return true;
 	}
@@ -738,7 +935,7 @@ class PhpWsdl{
 		self::Debug('CreateWsdlPorts');
 		$res=&$data['res'];
 		$server=$data['server'];
-		$res[]="\t".'<wsdl:portType name="'.$server->Name.'Soap">';
+		$res[]='<wsdl:portType name="'.$server->Name.'Soap">';
 		$i=-1;
 		$mLen=sizeof($server->Methods);
 		while(++$i<$mLen)
@@ -747,7 +944,7 @@ class PhpWsdl{
 			'CreateWsdlPortsAddHook',
 			$data
 		);
-		$res[]="\t".'</wsdl:portType>';
+		$res[]='</wsdl:portType>';
 		return true;
 	}
 	
@@ -761,8 +958,8 @@ class PhpWsdl{
 		self::Debug('CreateWsdlBindings');
 		$res=&$data['res'];
 		$server=$data['server'];
-		$res[]="\t".'<wsdl:binding name="'.$server->Name.'Soap" type="tns:'.$server->Name.'Soap">';
-		$res[]="\t\t".'<soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc" />';
+		$res[]='<wsdl:binding name="'.$server->Name.'Soap" type="tns:'.$server->Name.'Soap">';
+		$res[]='<soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc" />';
 		$i=-1;
 		$mLen=sizeof($server->Methods);
 		while(++$i<$mLen)
@@ -771,7 +968,7 @@ class PhpWsdl{
 			'CreateWsdlBindingsAddHook',
 			$data
 		);
-		$res[]="\t".'</wsdl:binding>';
+		$res[]='</wsdl:binding>';
 		return true;
 	}
 	
@@ -785,15 +982,17 @@ class PhpWsdl{
 		self::Debug('CreateWsdlService');
 		$res=&$data['res'];
 		$server=$data['server'];
-		$res[]="\t".'<wsdl:service name="'.$server->Name.'">';
-		$res[]="\t\t".'<wsdl:port name="'.$server->Name.'Soap" binding="tns:'.$server->Name.'Soap">';
-		$res[]="\t\t\t".'<soap:address location="'.$server->EndPoint.'" />';
-		$res[]="\t\t".'</wsdl:port>';
+		$res[]='<wsdl:service name="'.$server->Name.'">';
+		if($server->IncludeDocs&&!$server->Optimize&&!is_null($server->Docs))
+			$res[]='<wsdl:documentation><![CDATA['.$server->Docs.']]></wsdl:documentation>';
+		$res[]='<wsdl:port name="'.$server->Name.'Soap" binding="tns:'.$server->Name.'Soap">';
+		$res[]='<soap:address location="'.$server->EndPoint.'" />';
+		$res[]='</wsdl:port>';
 		self::CallHook(
 			'CreateWsdlServiceAddHook',
 			$data
 		);
-		$res[]="\t".'</wsdl:service>';
+		$res[]='</wsdl:service>';
 		return true;
 	}
 	
@@ -821,13 +1020,61 @@ class PhpWsdl{
 		$res=&$data['res'];
 		$server=$data['server'];
 		$optimizer=&$data['optimizer'];
-		$res=implode("\n",$res);
-		if($optimizer||$server->Optimize){
-			self::Debug('Optimize WSDL');
-			$res=preg_replace('/[\n|\t]/','',$res);
-		}
-		$res=utf8_encode($res);
+		$res=utf8_encode(implode('',$res));
+		$res=(!$optimizer&&!$server->Optimize)
+			?self::FormatXml($res)
+			:self::OptimizeXml($res);
 		$server->WSDL=$res;
+		return true;
+	}
+	
+	/**
+	 * Remove tabs and newline from XML
+	 * 
+	 * @param string $xml The unoptimized XML
+	 * @return string The optimized XML
+	 */
+	public static function OptimizeXml($xml){
+		self::Debug('Optimize XML');
+		return preg_replace('/[\n|\t]/','',$xml);
+	}
+	
+	/**
+	 * Format XML human readable
+	 * 
+	 * @param string $xml The XML
+	 * @return string Human readable XML
+	 */
+	public static function FormatXml($xml){
+		self::Debug('Produce human readable XML');
+		$input=fopen('data://text/plain,'.$xml,'r');
+		$output=fopen('php://temp','w');
+		$xf=new PhpWsdlFormatter($input,$output);
+		$xf->format();
+		rewind($output);
+		$xml=stream_get_contents($output);
+		fclose($input);
+		fclose($output);
+		return $xml;
+	}
+	
+	/**
+	 * Interpret the @service keyword
+	 * 
+	 * @param $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretService($data){
+		self::Debug('Interpret service');
+		$server=$data['server'];
+		$info=explode(' ',$data['keyword'][1],2);
+		if(sizeof($info)<1){
+			self::Debug('WARNING:  Invalid service definition');
+			return true;
+		}
+		$server->Name=$info[0];
+		if($server->ParseDocs&&sizeof($info)>1&&is_null($server->Docs))
+			$server->Docs=$info[1];
 		return true;
 	}
 	
@@ -870,8 +1117,10 @@ class PhpWsdl{
 	
 	/**
 	 * Output the WSDL to the client
+	 * 
+	 * @param boolean $withHeaders Output XML headers? (default: TRUE)
 	 */
-	public function OutputWsdl(){
+	public function OutputWsdl($withHeaders=true){
 		if(!self::CallHook(
 				'OutputWsdlHook',
 				Array(
@@ -881,7 +1130,8 @@ class PhpWsdl{
 		)
 			return;
 		self::Debug('Output WSDL');
-		header('Content-Type: text/xml; charset=UTF-8',true);
+		if($withHeaders)
+			header('Content-Type: text/xml; charset=UTF-8',true);
 		echo $this->CreateWsdl();
 	}
 
@@ -895,15 +1145,21 @@ class PhpWsdl{
 		if(!$this->IsWsdlRequested())
 			return false;
 		$this->OutputWsdl();
-		if($andExit)
+		if($andExit){
+			self::Debug('Exit script execution');
 			exit;
+		}
 		return true;
 	}
 	
 	/**
 	 * Output the HTML to the client
+	 * 
+	 * @param boolean $withHeaders Send HTML headers? (default: TRUE)
+	 * @param boolean $echo Print HTML (default: TRUE)
+	 * @return string The HTML
 	 */
-	public function OutputHtml(){
+	public function OutputHtml($withHeaders=true,$echo=true){
 		self::Debug('Output HTML');
 		if(sizeof($this->Methods)<1)
 			$this->CreateWsdl();
@@ -916,7 +1172,14 @@ class PhpWsdl{
 		)
 			return;
 		// Header
-		header('Content-Type: text/html; charset=UTF-8',true);
+		if($withHeaders)
+			header('Content-Type: text/html; charset=UTF-8',true);
+		$this->GetWsdlFromCache();
+		if(!is_null($this->HTML)){
+			if($echo)
+				echo $this->HTML;
+			return $this->HTML;
+		}
 		$res=Array();
 		$res[]='<html>';
 		$res[]='<head>';
@@ -1013,8 +1276,13 @@ class PhpWsdl{
 			));
 			if($temp['attachments']=='1'){
 				$temp['attachment_1']=$this->Name.'.wsdl:'.((is_null($this->WsdlUri))?$this->EndPoint.'?WSDL':$this->WsdlUri);
-				if($this->ParseDocs&&$this->IncludeDocs)
+				$cnt=1;
+				if($this->ParseDocs&&$this->IncludeDocs){
+					$cnt=2;
 					$temp['attachment_2']=$this->Name.'-doc.wsdl:'.((is_null($this->WsdlUri))?$this->EndPoint.'?WSDL':$this->WsdlUri).'&readable';
+				}
+				$cnt++;
+				$temp['attachment_'.$cnt]=$this->Name.'.soapclient.php:'.((is_null($this->PhpUri))?$this->EndPoint.'?PHPSOAPCLIENT':$this->PhpUri);
 			}
 			$options=Array();
 			$keys=array_keys($temp);
@@ -1042,7 +1310,7 @@ class PhpWsdl{
 		$res[]='</html>';
 		// Clean up the generated HTML and send it
 		$res=implode("\n",$res);
-		$res=str_replace('<br />','<br>',$res);// nl2br will produce XHTML (and nothing if the second parameter is FALSE!?)
+		$res=str_replace('<br />','<br>',$res);// Because nl2br will produce XHTML (and nothing if the second parameter is FALSE!?)
 		if(!self::CallHook(
 				'SendHtmlHook',
 				Array(
@@ -1052,7 +1320,12 @@ class PhpWsdl{
 			)
 		)
 			return;
-		echo utf8_encode($res);
+		$res=utf8_encode($res);
+		$this->HTML=$res;
+		$this->WriteWsdlToCache(null,null,null,true);
+		if($echo)
+			echo $res;
+		return $res;
 	}
 	
 	/**
@@ -1068,8 +1341,11 @@ class PhpWsdl{
 		$res[]='<h1>'.$server->Name.' SOAP WebService interface description</h1>';
 		$res[]='<p>Endpoint URI: <span class="pre">'.$server->EndPoint.'</span></p>';
 		$res[]='<p>WSDL URI: <span class="pre"><a href="'.$server->EndPoint.'?WSDL&readable">'.$server->EndPoint.'?WSDL</a></span></p>';
-		if(!is_null(self::$HTML2PDFLicenseKey)&&self::$HTML2PDFSettings['attachments']=='1')
-			$res[]='<p class="print">The WSDL files are attached to this PDF documentation: One with inline-documentation and one without.</p>';
+		$res[]='<p>PHP SOAP client download URI: <span class="pre"><a href="'.$server->EndPoint.'?PHPSOAPCLIENT">'.$server->EndPoint.'?PHPSOAPCLIENT</a></span></p>';
+		if(self::$HTML2PDFSettings['attachments']=='1'&&!is_null(self::$HTML2PDFLicenseKey))
+			$res[]='<p class="print">The WSDL files and a PHP SOAP client proxy class are attached to this PDF documentation.</p>';
+		if(!is_null($server->Docs))
+			$res[]='<p>'.nl2br(htmlentities($server->Docs)).'</p>';
 		return true;
 	}
 	
@@ -1086,8 +1362,7 @@ class PhpWsdl{
 		$methods=&$data['methods'];
 		$tLen=sizeof($types);
 		$mLen=sizeof($methods);
-		if(!is_null(self::$HTML2PDFLicenseKey))
-			$res[]='<div class="noprint">';
+		$res[]='<div class="noprint">';
 		$res[]='<h2>Index</h2>';
 		if($tLen>0){
 			$res[]='<p>Complex types:</p>';
@@ -1105,8 +1380,7 @@ class PhpWsdl{
 				$res[]='<li><a href="#'.$methods[$i]->Name.'"><span class="pre">'.$methods[$i]->Name.'</span></a></li>';
 			$res[]='</ul>';
 		}
-		if(!is_null(self::$HTML2PDFLicenseKey))
-			$res[]='</div>';
+		$res[]='</div>';
 		return true;
 	}
 	
@@ -1125,143 +1399,16 @@ class PhpWsdl{
 			$res[]='<h2>Public methods</h2>';
 			$i=-1;
 			while(++$i<$mLen)
-				self::CallHook(
-					'CreateHtmlMethodHook',
-					array_merge(
-						$data,
-						Array(
-							'method'		=>	$methods[$i]
-						)
+				$methods[$i]->CreateMethodHtml(array_merge(
+					$data,
+					Array(
+						'method'		=>	$methods[$i]
 					)
-				);
+				));
 		}
 		return true;
 	}
-	
-	/**
-	 * Create method
-	 * 
-	 * @param array $data The information object
-	 * @return boolean Response
-	 */
-	public static function CreateHtmlMethod($data){
-		self::Debug('CreateHtmlMethod');
-		$res=&$data['res'];
-		$m=&$data['method'];
-		$res[]='<h3>'.$m->Name.'</h3>';
-		$res[]='<a name="'.$m->Name.'"></a>';
-		$res[]='<p class="pre">';
-		$o=sizeof($res)-1;
-		if(!is_null($m->Return)){
-			$type=$m->Return->Type;
-			if(in_array($type,self::$BasicTypes)){
-				$res[$o].='<span class="blue">'.$type.'</span>';
-			}else{
-				$res[$o].='<a href="#'.$type.'"><span class="lightBlue">'.$type.'</span></a>';
-			}
-		}else{
-			$res[$o].='void';
-		}
-		$res[$o].=' <span class="bold">'.$m->Name.'</span> (';
-		$pLen=sizeof($m->Param);
-		$spacer='';
-		if($pLen>1){
-			$res[$o].='<br>';
-			$spacer='&nbsp;&nbsp;&nbsp;&nbsp;';
-		}
-		$hasDocs=false;
-		if($pLen>0){
-			$j=-1;
-			while(++$j<$pLen){
-				$p=$m->Param[$j];
-				if(in_array($p->Type,self::$BasicTypes)){
-					$res[]=$spacer.'<span class="blue">'.$p->Type.'</span> <span class="bold">'.$p->Name.'</span>';
-				}else{
-					$res[]=$spacer.'<a href="#'.$p->Type.'"><span class="lightBlue">'.$p->Type.'</span></a> <span class="bold">'.$p->Name.'</span>';
-				}
-				$o=sizeof($res)-1;
-				if($j<$pLen-1)
-					$res[$o].=', ';
-				if($pLen>1)
-					$res[$o].='<br>';
-				if(!$hasDocs)
-					if(!is_null($p->Docs))
-						$hasDocs=true;
-			}
-		}
-		$res[].=')</p>';
-		// Method documentation
-		if(!is_null($m->Docs))
-			$res[]='<p>'.nl2br(htmlentities($m->Docs)).'</p>';
-		// Parameters documentation
-		if($hasDocs){
-			$res[]='<ul>';
-			$j=-1;
-			while(++$j<$pLen)
-				self::CallHook(
-					'CreateHtmlParamHook',
-					array_merge(
-						$data,
-						Array(
-							'param'			=>	$m->Param[$j]
-						)
-					)
-				);
-			$res[]='</ul>';
-		}
-		// Return value documentation
-		if(!is_null($m->Return))
-			if(!is_null($m->Return->Docs))
-				self::CallHook(
-					'CreateHtmlReturnHook',
-					$data
-				);
-		return true;
-	}
-	
-	/**
-	 * Create return value
-	 * 
-	 * @param array $data The information object
-	 * @return boolean Response
-	 */
-	public static function CreateHtmlReturn($data){
-		self::Debug('CreateHtmlReturn');
-		$res=&$data['res'];
-		$m=&$data['method'];
-		$res[]='<p>Return value <span class="pre">';
-		$o=sizeof($res)-1;
-		$type=$m->Return->Type;
-		if(in_array($type,self::$BasicTypes)){
-			$res[$o].='<span class="blue">'.$type.'</span>';
-		}else{
-			$res[$o].='<a href="#'.$type.'"><span class="lightBlue">'.$type.'</span></a>';
-		}
-		$res[$o].='</span>: '.nl2br(htmlentities($m->Return->Docs)).'</p>';
-		return true;
-	}
-	
-	/**
-	 * Create parameter
-	 * 
-	 * @param array $data The information object
-	 * @return boolean Response
-	 */
-	public static function CreateHtmlParam($data){
-		self::Debug('CreateHtmlParam');
-		$res=&$data['res'];
-		$p=&$data['param'];
-		if(is_null($p->Docs))
-			return true;
-		if(in_array($p->Type,self::$BasicTypes)){
-			$res[]='<li class="pre"><span class="blue">'.$p->Type.'</span> <span class="bold">'.$p->Name.'</span>';
-		}else{
-			$res[]='<li class="pre"><a href="#'.$p->Type.'"><span class="lightBlue">'.$p->Type.'</span></a> <span class="bold">'.$p->Name.'</span>';
-		}
-		$res[sizeof($res)-1].='<br><span class="normal">'.nl2br(htmlentities($p->Docs)).'</span></li>';
-		return true;
-	}
-	
+
 	/**
 	 * Create complex types list
 	 * 
@@ -1278,94 +1425,13 @@ class PhpWsdl{
 			$res[]='<h2>Complex types</h2>';
 			$i=-1;
 			while(++$i<$tLen)
-				self::CallHook(
-					'CreateHtmlComplexTypeHook',
-					array_merge(
-						$data,
-						Array(
-							'type'			=>	$types[$i]
-						)
+				$types[$i]->CreateTypeHtml(array_merge(
+					$data,
+					Array(
+						'type'			=>	$types[$i]
 					)
-				);
+				));
 		}
-		return true;
-	}
-	
-	/**
-	 * Create complex type
-	 * 
-	 * @param array $data The information object
-	 * @return boolean Response
-	 */
-	public static function CreateHtmlComplexType($data){
-		self::Debug('CreateHtmlComplexType');
-		$res=&$data['res'];
-		$t=&$data['type'];
-		$res[]='<h3>'.$t->Name.'</h3>';
-		$res[]='<a name="'.$t->Name.'"></a>';
-		$eLen=sizeof($t->Elements);
-		if($t->IsArray){
-			// Array type
-			$res[]='<p>This is an array type of <span class="pre">';
-			$o=sizeof($res)-1;
-			$type=substr($t->Name,0,strlen($t->Name)-5);
-			if(in_array($type,self::$BasicTypes)){
-				$res[$o].='<span class="blue">'.$type.'</span>';
-			}else{
-				$res[$o].='<a href="#'.$type.'"><span class="lightBlue">'.$type.'</span></a>';
-			}
-			$res[$o].='</span>.</p>';
-			if(!is_null($t->Docs))
-				$res[]='<p>'.nl2br(htmlentities($t->Docs)).'</p>';
-		}else if($eLen>0){
-			// Complex type with elements
-			if(!is_null($t->Docs))
-				$res[]='<p>'.nl2br(htmlentities($t->Docs)).'</p>';
-			$res[]='<ul class="pre">';
-			$j=-1;
-			while(++$j<$eLen)
-				self::CallHook(
-					'CreateHtmlElementHook',
-					array_merge(
-						$data,
-						Array(
-							'element'		=>	$t->Elements[$j]
-						)
-					)
-				);
-			$res[]='</ul>';
-		}else{
-			// Complex type without elements
-			$res[]='<p>This type has no elements.</p>';
-		}
-		return true;
-	}
-	
-	/**
-	 * Create element
-	 * 
-	 * @param array $data The information object
-	 * @return boolean Response
-	 */
-	public static function CreateHtmlElement($data){
-		self::Debug('CreateHtmlElement');
-		$res=&$data['res'];
-		$e=&$data['element'];
-		if(in_array($e->Type,self::$BasicTypes)){
-			$res[]='<li><span class="blue">'.$e->Type.'</span> <span class="bold">'.$e->Name.'</span>';
-		}else{
-			$res[]='<li><a href="#'.$e->Type.'"><span class="lightBlue">'.$e->Type.'</span></a> <span class="bold">'.$e->Name.'</span>';
-		}
-		$o=sizeof($res)-1;
-		$temp=Array(
-			'nillable = <span class="blue">'.(($e->NillAble)?'true':'false').'</span>',
-			'minoccurs = <span class="blue">'.$e->MinOccurs.'</span>',
-			'maxoccurs = <span class="blue">'.$e->MaxOccurs.'</span>',
-		);
-		$res[$o].=' ('.implode(', ',$temp).')';
-		if(!is_null($e->Docs))
-			$res[$o].='<br><span class="normal">'.nl2br(htmlentities($e->Docs)).'</span>';
-		$res[$o].='</li>';
 		return true;
 	}
 	
@@ -1401,8 +1467,164 @@ class PhpWsdl{
 		if(!$this->IsHtmlRequested())
 			return false;
 		$this->OutputHtml();
-		if($andExit)
+		if($andExit){
+			self::Debug('Exit script execution');
 			exit;
+		}
+		return true;
+	}
+	
+	/**
+	 * Output the PHP SOAP client source for this webservice
+	 * 
+	 * @param boolean $withHeaders Send text headers? (default: TRUE)
+	 * @param boolean $echo Print source (default: TRUE)
+	 * @param array $options Options array (default: array)
+	 * @return string PHP source
+	 */
+	public function OutputPhp($withHeaders=true,$echo=true,$options=Array()){
+		self::Debug('Output PHP');
+		if(sizeof($this->Methods)<1)
+			$this->CreateWsdl();
+		if(!self::CallHook(
+				'OutputPhpHook',
+				Array(
+					'server'		=>	$this,
+					'withHeaders'	=>	&$withHeaders,
+					'echo'			=>	&$echo,
+					'options'		=>	&$options
+				)
+			)
+		)
+			return '';
+		// Options
+		if(!isset($options['class']))
+			$options['class']=$this->Name.'SoapClient';
+		if(!isset($options['openphp']))
+			$options['openphp']=true;
+		if(!isset($options['phpclient']))
+			$options['phpclient']=true;
+		// Header
+		if($withHeaders){
+			header('Content-Type: text/plain; charset=UTF-8',true);
+			header('Content-Disposition: attachment; filename='.$this->Name.'SoapClient.php');
+		}
+		$this->GetWsdlFromCache();
+		if(!is_null($this->PHP)){
+			if($echo)
+				echo $this->PHP;
+			return $this->PHP;
+		}
+		$res=Array();
+		if($options['openphp'])
+			$res[]="<?php";
+		$res[]="/**";
+		if(!is_null($this->Docs)){
+			$res[]=" * ".implode("\n * ",explode("\n",$this->Docs));
+			$res[]=" *";
+		}
+		$res[]=" * @service ".$this->Name;
+		$res[]=" */";
+		$res[]="class ".$options['class']."{";
+		$res[]="\t/**";
+		$res[]="\t * The WSDL URI";
+		$res[]="\t *";
+		$res[]="\t * @var string";
+		$res[]="\t */";
+		$res[]="\tpublic static \$_WsdlUri='".(!is_null($this->WsdlUri)?$this->WsdlUri:$this->EndPoint.'?WSDL')."';";
+		$res[]="\t/**";
+		$res[]="\t * The PHP SoapClient object";
+		$res[]="\t *";
+		$res[]="\t * @var object";
+		$res[]="\t */";
+		$res[]="\tpublic static \$_Server=null;";
+		self::CallHook(
+			'BeginCreatePhpHook',
+			Array(
+				'server'		=>	$this,
+				'withHeaders'	=>	&$withHeaders,
+				'echo'			=>	&$echo,
+				'options'		=>	&$options,
+				'res'			=>	&$res
+			)
+		);
+		$res[]='';
+		$res[]="\t/**";
+		$res[]="\t * Send a SOAP request to the server";
+		$res[]="\t *";
+		$res[]="\t * @param string \$method The method name";
+		$res[]="\t * @param array \$param The parameters";
+		$res[]="\t * @return mixed The server response";
+		$res[]="\t */";
+		$res[]="\tpublic static function _Call(\$method,\$param){";
+		if(self::CallHook(
+				'CreatePhpCallHook',
+				Array(
+					'server'		=>	$this,
+					'withHeaders'	=>	&$withHeaders,
+					'echo'			=>	&$echo,
+					'options'		=>	&$options,
+					'res'			=>	&$res
+				)
+			)
+		){
+			$res[]="\t\tif(is_null(self::\$_Server))";
+			if($options['phpclient']){
+				$res[]="\t\t\tself::\$_Server=new SoapClient(self::\$_WsdlUri);";
+				$res[]="\t\treturn self::\$_Server->__soapCall(\$method,\$param);";
+			}else{
+				$res[]="\t\t\tself::\$_Server=new PhpWsdlClient(self::\$_WsdlUri);";
+				$res[]="\t\treturn self::\$_Server->DoRequest(\$method,\$param);";
+			}
+		}
+		$res[]="\t}";
+		// Methods
+		$i=-1;
+		$len=sizeof($this->Methods);
+		while(++$i<$len){
+			$res[]='';
+			$res[]=$this->Methods[$i]->CreateMethodPhp($this);
+		}
+		$res[]="}";
+		// Types
+		$i=-1;
+		$len=sizeof($this->Types);
+		while(++$i<$len){
+			$res[]='';
+			$res[]=$this->Types[$i]->CreateTypePhp($this);
+		}
+		self::CallHook(
+			'EndCreatePhpHook',
+			Array(
+				'server'		=>	$this,
+				'withHeaders'	=>	&$withHeaders,
+				'echo'			=>	&$echo,
+				'options'		=>	&$options,
+				'res'			=>	&$res
+			)
+		);
+		$res=utf8_encode(implode("\n",$res));
+		$this->PHP=$res;
+		$this->WriteWsdlToCache(null,null,null,true);
+		if($echo)
+			echo $res;
+		return $res;
+	}
+	
+	/**
+	 * Output the PHP SOAP client source for this webservice, if requested
+	 * 
+	 * @param boolean $andExit Exit after sending the PHP source?
+	 * @return boolean PHP sent?
+	 */
+	public function OutputPhpOnRequest($andExit=true){
+		if(!$this->IsPhpRequested())
+			return false;
+		$this->OutputPhp();
+		if($andExit){
+			self::Debug('Exit script execution');
+			exit;
+		}
 		return true;
 	}
 	
@@ -1412,58 +1634,113 @@ class PhpWsdl{
 	 * @param string $wsdlFile The WSDL file name or NULL to let PhpWsdl decide (default: NULL)
 	 * @param string|object|array $class The class name to serve, the classname and class as array or NULL (default: NULL)
 	 * @param boolean $andExit Exit after running the server? (default: TRUE)
+	 * @param boolean $forceNoWsdl Force no WSDL usage? (default: FALSE);
 	 * @return boolean Did the server run?
 	 */
-	public function RunServer($wsdlFile=null,$class=null,$andExit=true){
+	public function RunServer($wsdlFile=null,$class=null,$andExit=true,$forceNoWsdl=false){
 		self::Debug('Run the server');
+		if($forceNoWsdl)
+			self::Debug('Forced non-WSDL mode');
 		// WSDL requested?
 		if($this->OutputWsdlOnRequest($andExit))
+			return false;
+		// PHP requested?
+		if($this->OutputPhpOnRequest($andExit))
 			return false;
 		// HTML requested?
 		if($this->OutputHtmlOnRequest($andExit))
 			return false;
+		// Login
+		$user=null;
+		$password=null;
+		if($this->RequireLogin){
+			if(isset($_SERVER['PHP_AUTH_USER'])||isset($_SERVER['PHP_AUTH_PW'])){
+				$user=(isset($_SERVER['PHP_AUTH_USER']))?$_SERVER['PHP_AUTH_USER']:null;
+				$password=(isset($_SERVER['PHP_AUTH_PW']))?$_SERVER['PHP_AUTH_PW']:null;
+			}
+			self::Debug('Check login '.$user.':'.str_repeat('*',strlen($password)));
+			if(!self::CallHook(
+					'LoginHook',
+					Array(
+						'server'		=>	$this,
+						'user'			=>	&$user,
+						'password'		=>	&$password
+					)
+				)
+			){
+				self::Debug('Login required');
+				header('WWW-Authenticate: Basic realm="SOAP webservice login required"');
+			    header('HTTP/1.0 401 Unauthorized');
+				if($andExit){
+					self::Debug('Exit script execution');
+					exit;
+				}
+			    return false;
+			}
+		}
 		// Load the proxy
 		$useProxy=false;
 		if(is_array($class)){
-			self::Debug('Use the proxy');
+			self::Debug('Use the proxy for '.$class[0]);
 			self::$ProxyObject=$class[1];
 			self::$ProxyServer=$this;
 			$class=$class[0];
 			$useProxy=true;
 		}
-		// Set the handler class name
+		// Ensure a webservice name
 		if(is_null($class)){
-			self::Debug('No class name yet');
-			if(is_null($this->Name))
-				if(!$this->DetermineConfiguration())
-					throw(new Exception('Could not find the webservice handler class name'));
-			$class=$this->Name;
+			self::Debug('No webservice name yet');
+			if(!$this->DetermineConfiguration())
+				throw(new Exception('Invalid configuration'));
+			if(!is_null($this->Name))
+				$class=$this->Name;
 		}else if(is_string($class)){
+			self::Debug('Using '.$class.' as webservice name');
 			$this->Name=$class;
 		}
-		self::Debug('Use class '.$class);
+		self::Debug('Use class '.((!is_object($class))?$class:get_class($class)));
 		// Load WSDL
-		if(!$useProxy){
+		if(!$forceNoWsdl&&(!$useProxy||self::$UseProxyWsdl)){
 			self::Debug('Load WSDL');
+			$this->CreateWsdl(false,true);
 			if(is_null($wsdlFile))
 				$wsdlFile=$this->GetCacheFileName();
-			$this->CreateWsdl(false,true);
+			if(!is_null($wsdlFile))
+				if(!file_exists($wsdlFile)){
+					self::Debug('WSDL file "'.$wsdlFile.'" does not exists');
+					$wsdlFile=null;
+				}
 		}
-		if(!$useProxy&&!is_null($wsdlFile))
-			if(!file_exists($wsdlFile)){
-				self::Debug('No WSDL file');
-				$wsdlFile=null;
-			}
 		// Load the files, if the webservice handler class doesn't exist
-		if(!class_exists($class)){
-			self::Debug('Try to load the webservice handler class');
-			$i=-1;
-			$len=sizeof($this->Files);
-			while(++$i<$len)
-				require_once($this->Files[$i]);
-			if(!class_exists($class))
-				throw(new Exception('Could not autoload class "'.$class.'"'));
-		}
+		if(!is_object($class))
+			if(!class_exists($class)&&!$this->IsOnlyGlobal()){
+				self::Debug('Try to load the webservice handler class');
+				$i=-1;
+				$len=sizeof($this->Files);
+				while(++$i<$len){
+					self::Debug('Load '.$this->Files[$i]);
+					require_once($this->Files[$i]);
+				}
+				if(!class_exists($class)){
+					// Try class.webservice.php
+					if(file_exists('class.webservice.php')){
+						self::Debug('Try to load class.webservice.php');
+						require_once('class.webservice.php');
+						if(class_exists($class))
+							$this->Files[]='class.webservice.php';
+					}
+					if(!class_exists($class))
+						if(file_exists(dirname(__FILE__).'/class.webservice.php')){
+							self::Debug('Try to load '.dirname(__FILE__).'/class.webservice.php');
+							require_once(dirname(__FILE__).'/class.webservice.php');
+							if(class_exists($class))
+								$this->Files[]=dirname(__FILE__).'/class.webservice.php';
+						}
+					if(!class_exists($class))
+						// A handler class or object is required when using non-global methods!
+						throw(new Exception('Webservice handler class not present'));
+				}
+			}
 		// Prepare the SOAP server
 		$this->SoapServer=null;
 		if(self::CallHook(
@@ -1473,24 +1750,57 @@ class PhpWsdl{
 					'soapserver'	=>	&$this->SoapServer,
 					'wsdlfile'		=>	&$wsdlFile,
 					'class'			=>	&$class,
-					'useproxy'		=>	&$useProxy,// Is the proxy being used?
-					'andexit'		=>	&$andExit
+					'useproxy'		=>	&$useProxy,
+					'forcenowsdl'	=>	&$forceNoWsdl,
+					'andexit'		=>	&$andExit,
+					'user'			=>	&$user,
+					'password'		=>	&$password
 				)
 			)
 		){
 			self::Debug('Prepare the SOAP server');
-			$this->SoapServer=new SoapServer(
-				($useProxy)?null:$wsdlFile,
-				array_merge($this->SoapServerOptions,Array(
-					'actor'			=>	$this->EndPoint,
-					'uri'			=>	$this->NameSpace,
-				))
-			);
-			if($useProxy||!is_object($class)){
-				$this->SoapServer->setClass(($useProxy)?'PhpWsdlProxy':$class);
+			// WSDL file
+			$wsdlFile=($forceNoWsdl||($useProxy&&!self::$UseProxyWsdl))?null:$wsdlFile;
+			if(!is_null($wsdlFile)){
+				self::Debug('Using WSDL file '.$wsdlFile);
 			}else{
+				self::Debug('No WSDL file');
+			}
+			// Server options
+			$temp=Array(
+				'actor'			=>	$this->EndPoint,
+				'uri'			=>	$this->NameSpace,
+			);
+			$temp=array_merge($this->SoapServerOptions,$temp);
+			if(self::$Debugging)
+				self::Debug('Server options: '.print_r($temp,true));
+			// Create the server object
+			self::Debug('Creating PHP SoapServer object');
+			$this->SoapServer=new SoapServer(
+				$wsdlFile,
+				$temp
+			);
+			// Set the handler class or object
+			if($useProxy||!is_object($class)){
+				$temp=($useProxy)?'PhpWsdlProxy':$class;
+				if(!is_null($temp)){
+					self::Debug('Setting server class '.$temp);
+					$this->SoapServer->setClass($temp);
+				}else{
+					self::Debug('No server class or object');
+				}
+			}else{
+				self::Debug('Setting server object '.get_class($class));
 				$this->SoapServer->setObject($class);
 			}
+			// Add global methods
+			$i=-1;
+			$len=sizeof($this->Methods);
+			while(++$i<$len)
+				if($this->Methods[$i]->IsGlobal){
+					self::Debug('Adding global method '.$this->Methods[$i]->Name);
+					$this->SoapServer->addFunction($this->Methods[$i]->Name);
+				}
 		}
 		// Run the SOAP server
 		if(self::CallHook(
@@ -1500,15 +1810,20 @@ class PhpWsdl{
 					'soapserver'	=>	&$this->SoapServer,
 					'wsdlfile'		=>	&$wsdlFile,
 					'class'			=>	&$class,
-					'useproxy'		=>	&$useProxy,// Is the proxy being used?
-					'andexit'		=>	&$andExit
+					'useproxy'		=>	&$useProxy,
+					'forcenowsdl'	=>	&$forceNoWsdl,
+					'andexit'		=>	&$andExit,
+					'user'			=>	&$user,
+					'password'		=>	&$password
 				)
 			)
 		){
 			self::Debug('Run the SOAP server');
 			$this->SoapServer->handle();
-			if($andExit)
+			if($andExit){
+				self::Debug('Exit script execution');
 				exit;
+			}
 		}
 		return true;
 	}
@@ -1556,7 +1871,16 @@ class PhpWsdl{
 	 * @return string The cache filename or NULL, if caching is disabled
 	 */
 	public function GetCacheFileName($endpoint=null){
-		return (is_null(self::$CacheFolder))?null:self::$CacheFolder.'/'.sha1((is_null($endpoint))?$this->EndPoint:$endpoint).'.wsdl';
+		$data=Array(
+			'server'		=>	$this,
+			'endpoint'		=>	$endpoint,
+			'filename'		=>	(is_null(self::$CacheFolder))?null:self::$CacheFolder.'/'.sha1((is_null($endpoint))?$this->EndPoint:$endpoint).'.wsdl'
+		);
+		self::CallHook(
+			'CacheFileNameHook',
+			$data
+		);
+		return $data['filename'];
 	}
 
 	/**
@@ -1601,11 +1925,12 @@ class PhpWsdl{
 			return $this->WSDL;
 		if(is_null($file))
 			$file=$this->GetCacheFileName();
-		if(!$force)
+		if(!$force){
 			if(!$this->IsCacheValid($file))
 				return null;
-		if(!$this->CacheFileExists($file))
+		}else if(!$this->CacheFileExists($file)){
 			return null;
+		}
 		$this->WSDL=file_get_contents($file);
 		if(!$nounserialize){
 			self::Debug('Unserialize methods, types and files');
@@ -1614,7 +1939,40 @@ class PhpWsdl{
 			$this->Types=$data['types'];
 			$this->Files=$data['files'];
 			$this->Name=$data['name'];
+			$this->Docs=$data['docs'];
+			$this->HTML=$data['html'];
+			$this->PHP=$data['php'];
+			$this->WsdlUri=$data['wsdluri'];
+			$this->PhpUri=$data['phpuri'];
+			$this->DocUri=$data['docuri'];
+			self::CallHook(
+				'ReadCacheHook',
+				array_merge(
+					$data,
+					Array(
+						'server'		=>	$this
+					)
+				)
+			);
+			if($data['version']!=self::$VERSION){
+				self::Debug('Could not use cache from version '.$data['version']);
+				$this->Methods=Array();
+				$this->Types=Array();
+				$this->Files=Array();
+				$this->Name=null;
+				$this->Docs=null;
+				$this->HTML=null;
+				$this->PHP=null;
+				$this->WsdlUri=null;
+				$this->PhpUri=null;
+				$this->DocUri=null;
+				$this->WSDL=null;
+				$this->TidyCacheFolder(true);
+				return null;
+			}
 		}
+		$this->ConfigurationDetermined=true;
+		$this->SourcesParsed=true;
 		return $this->WSDL;
 	}
 	
@@ -1624,9 +1982,10 @@ class PhpWsdl{
 	 * @param string $wsdl The UTF-8 encoded WSDL string (default: NULL)
 	 * @param string $endpoint The SOAP endpoint or NULL to use the default (default: NULL)
 	 * @param string $file The target filename or NULL to use the default (default: NULL)
+	 * @param boolean $force Force refresh (default: FALSE)
 	 * @return boolean Succeed?
 	 */
-	public function WriteWsdlToCache($wsdl=null,$endpoint=null,$file=null){
+	public function WriteWsdlToCache($wsdl=null,$endpoint=null,$file=null,$force=false){
 		self::Debug('Write WSDL to the cache');
 		if(is_null($endpoint))
 			$endpoint=$this->EndPoint;
@@ -1639,11 +1998,12 @@ class PhpWsdl{
 			}
 			$wsdl=$this->WSDL;
 		}
-		if(is_null($file))
-			$file=$this->GetCacheFileName($endpoint);
 		if(is_null($file)){
-			self::Debug('No cache file');
-			return false;// No cache file
+			$file=$this->GetCacheFileName($endpoint);
+			if(is_null($file)){
+				self::Debug('No cache file');
+				return false;// No cache file
+			}
 		}
 		$temp=substr($file,0,1);
 		if($temp!='/'&&$temp!='.'){
@@ -1653,10 +2013,11 @@ class PhpWsdl{
 			}
 			$file=self::$CacheFolder.'/'.$file;
 		}
-		if($this->IsCacheValid($file)){
-			self::Debug('Cache is still valid');
-			return true;// Existing cache is still valid
-		}
+		if(!$force)
+			if($this->IsCacheValid($file)){
+				self::Debug('Cache is still valid');
+				return true;// Existing cache is still valid
+			}
 		self::Debug('Write to '.$file);
 		if(file_put_contents($file,$wsdl)===false){
 			self::Debug('Could not write to cache');
@@ -1667,16 +2028,67 @@ class PhpWsdl{
 			return false;// Error writing to cache
 		}
 		$data=Array(
+			'version'		=>	self::$VERSION,
 			'methods'		=>	$this->Methods,
 			'types'			=>	$this->Types,
 			'files'			=>	$this->Files,
-			'name'			=>	$this->Name
+			'name'			=>	$this->Name,
+			'docs'			=>	$this->Docs,
+			'html'			=>	$this->HTML,
+			'php'			=>	$this->PHP,
+			'wsdluri'		=>	$this->WsdlUri,
+			'phpuri'		=>	$this->PhpUri,
+			'docuri'		=>	$this->DocUri
+		);
+		self::CallHook(
+			'WriteCacheHook',
+			array_merge(
+				$data,
+				Array(
+					'server'		=>	$this
+				)
+			)
 		);
 		if(file_put_contents($file.'.obj',serialize($data))===false){
 			self::Debug('Could not write serialized cache');
-			return false;
+			return false;// Error writing to cache
 		}
 		return true;
+	}
+	
+	/**
+	 * Determine if the cache folder is writeable
+	 * 
+	 * @param string $folder The folder or NULL to use the static property CacheFolder (default: NULL)
+	 * @return boolean Writeable?
+	 */
+	public static function IsCacheFolderWriteAble($folder=null){
+		if(!is_null(self::$CacheFolderWriteAble))
+			return self::$CacheFolderWriteAble;
+		if(is_null($folder))
+			$folder=self::$CacheFolder;
+		if(is_null($folder)){
+			self::$CacheFolderWriteAble=false;
+			return false;
+		}
+		if(!is_dir($folder)){
+			self::Debug('Invalid cache folder (not a directory?)');
+			self::$CacheFolderWriteAble=false;
+			return;
+		}
+		$file=uniqid();
+		while(file_exists($folder.'/'.$file))
+			$file=uniqid();
+		$file=$folder.'/'.$file;
+		$temp=uniqid();
+		if(file_put_contents($file,$temp)===false){
+			self::$CacheFolderWriteAble=false;
+			return false;
+		}
+		$res=file_get_contents($file)===$temp;
+		unlink($file);
+		self::$CacheFolderWriteAble=$res;
+		return $res;
 	}
 	
 	/**
@@ -1716,17 +2128,23 @@ class PhpWsdl{
 	 * 
 	 * @param boolean $mineOnly Only delete the cache files for this definition? (default: FALSE)
 	 * @param boolean $cleanUp Only delete the cache files that are timed out? (default: FALSE)
+	 * @param string $wsdlFile The WSDL filename (default: NULL)
 	 * @return string[] The deleted filenames
 	 */
-	public function TidyCacheFolder($mineOnly=false,$cleanUp=false){
+	public function TidyCacheFolder($mineOnly=false,$cleanUp=false,$wsdlFile=null){
 		if(is_null(self::$CacheFolder))
 			return Array();
 		$deleted=Array();
-		if($cleanUp)
+		if($cleanUp){
 			self::Debug('Cleanup cache');
+		}else if($mineOnly){
+			self::Debug('Clean own cache');
+		}else{
+			self::Debug('Clean all cache');
+		}
 		if($mineOnly){
 			self::Debug('Delete own cache');
-			$file=$this->GetCacheFileName();
+			$file=(is_null($wsdlFile))?$this->GetCacheFileName():$wsdlFile;
 			if($cleanUp)
 				if($this->IsCacheValid($file))
 					return $deleted;
@@ -1793,7 +2211,7 @@ class PhpWsdl{
 			)
 		)
 			return $type;
-		return ((in_array($type,self::$BasicTypes))?'s:':'tns:').$type;
+		return ((in_array($type,self::$BasicTypes))?self::$Config['xsd']:self::$Config['tns']).':'.$type;
 	}
 	
 	/**
@@ -1865,9 +2283,16 @@ class PhpWsdl{
 		if(!self::$Debugging)
 			return;
 		$temp=date('Y-m-d H:i:s')."\t".$str;
+		if(self::$DebugBackTrace){
+			$trace=debug_backtrace();
+			$temp.=" ('".$trace[1]['function']."' in '".basename($trace[1]['file'])."' at line #".$trace[1]['line'].")";
+		}
 		self::$DebugInfo[]=$temp;
 		if(!is_null(self::$DebugFile))
-			file_put_contents(self::$DebugFile,$temp."\n",FILE_APPEND);
+			if(file_put_contents(self::$DebugFile,$temp."\n",FILE_APPEND)===false){
+				self::Debug('Could not write to debug file '.self::$DebugFile);
+				self::$DebugFile=null;
+			}
 	}
 
 	/**
@@ -1886,8 +2311,12 @@ class PhpWsdl{
 			'wsdl'			=>	'http://schemas.xmlsoap.org/wsdl/',
 			'soapenc'		=>	'http://schemas.xmlsoap.org/soap/encoding/'
 		);
-		self::$CacheFolder=sys_get_temp_dir();
-		self::$Config['extensions']=Array();
+		self::EnableCache();
+		self::$Config['extensions']=Array();// A configuration space for extensions
+		self::$Config['tns']='tns';			// The xmlns name for the target namespace
+		self::$Config['xsd']='s';			// The xmlns name for the XSD namespace
+		// Parser hooks
+		self::RegisterHook('InterpretKeywordserviceHook','internal','PhpWsdl::InterpretService');
 		// WSDL hooks
 		self::RegisterHook('CreateWsdlHeaderHook','internal','PhpWsdl::CreateWsdlHeader');
 		self::RegisterHook('CreateWsdlTypeSchemaHook','internal','PhpWsdl::CreateWsdlTypeSchema');
@@ -1901,12 +2330,7 @@ class PhpWsdl{
 		self::RegisterHook('CreateHtmlGeneralHook','internal','PhpWsdl::CreateHtmlGeneral');
 		self::RegisterHook('CreateHtmlIndexHook','internal','PhpWsdl::CreateHtmlIndex');
 		self::RegisterHook('CreateHtmlMethodsHook','internal','PhpWsdl::CreateHtmlMethods');
-		self::RegisterHook('CreateHtmlMethodHook','internal','PhpWsdl::CreateHtmlMethod');
-		self::RegisterHook('CreateHtmlReturnHook','internal','PhpWsdl::CreateHtmlReturn');
-		self::RegisterHook('CreateHtmlParamHook','internal','PhpWsdl::CreateHtmlParam');
 		self::RegisterHook('CreateHtmlComplexTypesHook','internal','PhpWsdl::CreateHtmlComplexTypes');
-		self::RegisterHook('CreateHtmlComplexTypeHook','internal','PhpWsdl::CreateHtmlComplexType');
-		self::RegisterHook('CreateHtmlElementHook','internal','PhpWsdl::CreateHtmlElement');
 		// Extensions
 		self::Debug('Load extensions');
 		$files=glob(dirname(__FILE__).'/'.'class.phpwsdl.*.php');
@@ -1920,5 +2344,16 @@ class PhpWsdl{
 		}else{
 			self::Debug('"glob" failed');
 		}
+	}
+
+	/**
+	 * Do things after the environment is configured
+	 */
+	public static function PostInit(){
+		self::CallHook('PostInitHook');
+		// Autorun
+		global $PhpWsdlAutoRun;
+		if(self::$AutoRun||$PhpWsdlAutoRun)
+			self::RunQuickMode();
 	}
 }

@@ -21,6 +21,7 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
 PhpWsdl::RegisterHook('InterpretKeywordpw_omitfncHook','internal','PhpWsdlMethod::InterpretOmit');
+PhpWsdl::RegisterHook('InterpretKeywordignoreHook','internal','PhpWsdlMethod::InterpretOmit');
 PhpWsdl::RegisterHook('InterpretKeywordpw_setHook','internal','PhpWsdlMethod::InterpretSetting');
 PhpWsdl::RegisterHook('CreateObjectHook','internalmethod','PhpWsdlMethod::CreateMethodObject');
 
@@ -29,13 +30,7 @@ PhpWsdl::RegisterHook('CreateObjectHook','internalmethod','PhpWsdlMethod::Create
  * 
  * @author Andreas Zimmermann, wan24.de
  */
-class PhpWsdlMethod{
-	/**
-	 * The method name
-	 * 
-	 * @var string
-	 */
-	public $Name;
+class PhpWsdlMethod extends PhpWsdlObject{
 	/**
 	 * A list of parameters
 	 * 
@@ -49,11 +44,17 @@ class PhpWsdlMethod{
 	 */
 	public $Return=null;
 	/**
-	 * Documentation
+	 * A global method?
 	 * 
-	 * @var string
+	 * @var boolean
 	 */
-	public $Docs=null;
+	public $IsGlobal=false;
+	/**
+	 * A new method is global per default?
+	 * 
+	 * @var boolean
+	 */
+	public static $IsGlobalDefault=false;
 	
 	/**
 	 * Constructor
@@ -63,16 +64,16 @@ class PhpWsdlMethod{
 	 * @param PhpWsdlParam $return Optional the return value (default: NULL)
 	 * @param array $settings Optional the settings hash array (default: NULL)
 	 */
-	public function PhPWsdlMethod($name,$param=null,$return=null,$settings=null){
+	public function PhpWsdlMethod($name,$param=null,$return=null,$settings=null){
 		PhpWsdl::Debug('New method '.$name);
-		$this->Name=$name;
+		parent::PhpWsdlObject($name,$settings);
 		if(!is_null($param))
 			$this->Param=$param;
-		if(!is_null($return))
-			$this->Return=$return;
+		$this->Return=$return;
+		$this->IsGlobal=self::$IsGlobalDefault;
 		if(!is_null($settings))
-			if(isset($settings['docs']))
-				$this->Docs=$settings['docs'];
+			if(isset($settings['global']))
+				$this->IsGlobal=$settings['global']=='true'||$settings['global']=='1';
 	}
 	
 	/**
@@ -84,7 +85,7 @@ class PhpWsdlMethod{
 	public function CreatePortType($pw){
 		PhpWsdl::Debug('Create WSDL port type for method '.$this->Name);
 		$res=Array();
-		$res[]="\t\t".'<wsdl:operation name="'.$this->Name.'"';
+		$res[]='<wsdl:operation name="'.$this->Name.'"';
 		$o=sizeof($res)-1;
 		$pLen=sizeof($this->Param);
 		if($pLen>1){
@@ -96,11 +97,11 @@ class PhpWsdlMethod{
 		}
 		$res[$o].='>';
 		if($pw->IncludeDocs&&!$pw->Optimize&&!is_null($this->Docs))
-			$res[]="\t\t\t".'<wsdl:documentation><![CDATA['.$this->Docs.']]></wsdl:documentation>';
-		$res[]="\t\t\t".'<wsdl:input message="tns:'.$this->Name.'SoapIn" />';
-		$res[]="\t\t\t".'<wsdl:output message="tns:'.$this->Name.'SoapOut" />';
-		$res[]="\t\t".'</wsdl:operation>';
-		return implode("\n",$res);
+			$res[]='<wsdl:documentation><![CDATA['.$this->Docs.']]></wsdl:documentation>';
+		$res[]='<wsdl:input message="tns:'.$this->Name.'SoapIn" />';
+		$res[]='<wsdl:output message="tns:'.$this->Name.'SoapOut" />';
+		$res[]='</wsdl:operation>';
+		return implode('',$res);
 	}
 	
 	/**
@@ -112,10 +113,10 @@ class PhpWsdlMethod{
 	public function CreateBinding($pw){
 		PhpWsdl::Debug('Create WSDL binding for method '.$this->Name);
 		$res=Array();
-		$res[]="\t\t".'<wsdl:operation name="'.$this->Name.'">';
-		$res[]="\t\t\t".'<soap:operation soapAction="'.$pw->NameSpace.$this->Name.'" />';
-		$res[]="\t\t\t".'<wsdl:input>';
-		$res[]="\t\t\t\t".'<soap:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="'.$pw->NameSpace.'"';
+		$res[]='<wsdl:operation name="'.$this->Name.'">';
+		$res[]='<soap:operation soapAction="'.$pw->NameSpace.$this->Name.'" />';
+		$res[]='<wsdl:input>';
+		$res[]='<soap:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="'.$pw->NameSpace.'"';
 		$pLen=sizeof($this->Param);
 		if($pLen>0){
 			$temp=Array();
@@ -125,15 +126,15 @@ class PhpWsdlMethod{
 			$res[sizeof($res)-1].=' parts="'.implode(' ',$temp).'"';
 		}
 		$res[sizeof($res)-1].=' />';
-		$res[]="\t\t\t".'</wsdl:input>';
-		$res[]="\t\t\t".'<wsdl:output>';
-		$res[]="\t\t\t\t".'<soap:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="'.$pw->NameSpace.'"';
+		$res[]='</wsdl:input>';
+		$res[]='<wsdl:output>';
+		$res[]='<soap:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="'.$pw->NameSpace.'"';
 		if(!is_null($this->Return))
 			$res[sizeof($res)-1].=' parts="'.$this->Return->Name.'"';
 		$res[sizeof($res)-1].=' />';
-		$res[]="\t\t\t".'</wsdl:output>';
-		$res[]="\t\t".'</wsdl:operation>';
-		return implode("\n",$res);
+		$res[]='</wsdl:output>';
+		$res[]='</wsdl:operation>';
+		return implode('',$res);
 	}
 	
 	/**
@@ -146,25 +147,27 @@ class PhpWsdlMethod{
 		PhpWsdl::Debug('Create WSDL message for method '.$this->Name);
 		$pLen=sizeof($this->Param);
 		$res=Array();
+		// Request
 		if($pLen<1){
-			$res[]="\t".'<wsdl:message name="'.$this->Name.'SoapIn" />';
+			$res[]='<wsdl:message name="'.$this->Name.'SoapIn" />';
 		}else{
-			$res[]="\t".'<wsdl:message name="'.$this->Name.'SoapIn">';
+			$res[]='<wsdl:message name="'.$this->Name.'SoapIn">';
 			$i=-1;
 			while(++$i<$pLen)
 				$res[]=$this->Param[$i]->CreatePart($pw);
-			$res[]="\t".'</wsdl:message>';
+			$res[]='</wsdl:message>';
 		}
+		// Response
 		if(is_null($this->Return)){
-			$res[]="\t".'<wsdl:message name="'.$this->Name.'SoapOut" />';
+			$res[]='<wsdl:message name="'.$this->Name.'SoapOut" />';
 		}else{
-			$res[]="\t".'<wsdl:message name="'.$this->Name.'SoapOut">';
+			$res[]='<wsdl:message name="'.$this->Name.'SoapOut">';
 			$res[]=$this->Return->CreatePart($pw);
-			$res[]="\t".'</wsdl:message>';
+			$res[]='</wsdl:message>';
 		}
-		return implode("\n",$res);
+		return implode('',$res);
 	}
-
+	
 	/**
 	 * Find a parameter of this method
 	 * 
@@ -184,6 +187,113 @@ class PhpWsdlMethod{
 	}
 	
 	/**
+	 * Create HTML docs
+	 * 
+	 * @param array $data Some data
+	 */
+	public function CreateMethodHtml($data){
+		PhpWsdl::Debug('CreateMethodHtml for '.$data['method']->Name);
+		$res=&$data['res'];
+		$m=&$data['method'];
+		$res[]='<h3>'.$m->Name.'</h3>';
+		$res[]='<a name="'.$m->Name.'"></a>';
+		$res[]='<p class="pre">';
+		$o=sizeof($res)-1;
+		if(!is_null($m->Return)){
+			$type=$m->Return->Type;
+			if(in_array($type,PhpWsdl::$BasicTypes)){
+				$res[$o].='<span class="blue">'.$type.'</span>';
+			}else{
+				$res[$o].='<a href="#'.$type.'"><span class="lightBlue">'.$type.'</span></a>';
+			}
+		}else{
+			$res[$o].='void';
+		}
+		$res[$o].=' <span class="bold">'.$m->Name.'</span> (';
+		$pLen=sizeof($m->Param);
+		$spacer='';
+		if($pLen>1){
+			$res[$o].='<br>';
+			$spacer='&nbsp;&nbsp;&nbsp;&nbsp;';
+		}
+		$hasDocs=false;
+		if($pLen>0){
+			$j=-1;
+			while(++$j<$pLen){
+				$p=$m->Param[$j];
+				if(in_array($p->Type,PhpWsdl::$BasicTypes)){
+					$res[]=$spacer.'<span class="blue">'.$p->Type.'</span> <span class="bold">'.$p->Name.'</span>';
+				}else{
+					$res[]=$spacer.'<a href="#'.$p->Type.'"><span class="lightBlue">'.$p->Type.'</span></a> <span class="bold">'.$p->Name.'</span>';
+				}
+				$o=sizeof($res)-1;
+				if($j<$pLen-1)
+					$res[$o].=', ';
+				if($pLen>1)
+					$res[$o].='<br>';
+				if(!$hasDocs)
+					if(!is_null($p->Docs))
+						$hasDocs=true;
+			}
+		}
+		$res[].=')</p>';
+		// Method documentation
+		if(!is_null($m->Docs))
+			$res[]='<p>'.nl2br(htmlentities($m->Docs)).'</p>';
+		// Parameters documentation
+		if($hasDocs){
+			$res[]='<ul>';
+			$j=-1;
+			while(++$j<$pLen)
+				$m->Param[$j]->CreateParamHtml(array_merge(
+						$data,
+						Array(
+							'param'			=>	$m->Param[$j]
+						)
+					)
+				);
+			$res[]='</ul>';
+		}
+		// Return value documentation
+		if(!is_null($m->Return)&&!is_null($m->Return->Docs))
+			$m->Return->CreateReturnHtml($data);
+	}
+	
+	/**
+	 * Create method PHP
+	 * 
+	 * @param PhpWsdl $server The PhpWsdl object
+	 * @return string PHP code
+	 */
+	public function CreateMethodPhp($server){
+		$res=Array();
+		$res[]="\t/**";
+		if(!is_null($this->Docs)){
+			$res[]="\t * ".implode("\n\t * ",explode("\n",$this->Docs));
+			$res[]="\t *";
+		}
+		$param=Array();
+		$i=-1;
+		$pLen=sizeof($this->Param);
+		while(++$i<$pLen){
+			$p=$this->Param[$i];
+			$param[]='$'.$p->Name;
+			$res[]="\t * @param ".$p->Type." \$".$p->Name.((!is_null($p->Docs))?" ".implode("\n\t * ",explode("\n",$p->Docs)):"");
+		}
+		if(!is_null($this->Return)){
+			$res[]="\t * @return ".$this->Return->Type.((!is_null($this->Return->Docs))?" ".implode("\n\t * ",explode("\n",$this->Return->Docs)):"");
+		}
+		$res[]="\t */";
+		$res[]="\tpublic function ".$this->Name."(".implode(',',$param)."){";
+		$res[]="\t\treturn self::_Call('".$this->Name."',Array(";
+		if($pLen>0)
+			$res[]="\t\t\t".implode(",\n\t\t\t",$param);
+		$res[]="\t\t));";
+		$res[]="\t}";
+		return implode("\n",$res);
+	}
+	
+	/**
 	 * Interpret a setting
 	 * 
 	 * @param array $data The parser data
@@ -193,7 +303,7 @@ class PhpWsdlMethod{
 		$info=explode(' ',$data['keyword'][1],2);
 		if(sizeof($info)<1)
 			return true;
-		PhpWsdl::Debug('Intrepret setting '.$info[0]);
+		PhpWsdl::Debug('Interpret setting '.$info[0]);
 		$info=explode('=',$info[0],2);
 		if(sizeof($info)>1){
 			$data['settings'][$info[0]]=$info[1];
@@ -210,7 +320,7 @@ class PhpWsdlMethod{
 	 * @return boolean Response
 	 */
 	public static function InterpretOmit($data){
-		PhpWsdl::Debug('Interpret omitfnc');
+		PhpWsdl::Debug('Interpret omitfnc/ignore');
 		$data['omit']=true;
 		return true;
 	}
@@ -229,11 +339,17 @@ class PhpWsdlMethod{
 		if(!is_null($data['type']))
 			return true;
 		PhpWsdl::Debug('Add method '.$data['method']);
-		if(!is_null($data['docs']))
-			$data['settings']['docs']=$data['docs'];
+		$server=$data['server'];
+		if(!is_null($server->GetMethod($data['method']))){
+			PhpWsdl::Debug('WARNING: Double method detected!');
+			return true;
+		}
+		if($server->ParseDocs)
+			if(!is_null($data['docs']))
+				$data['settings']['docs']=$data['docs'];
 		$data['obj']=new PhpWsdlMethod($data['method'],$data['param'],$data['return'],$data['settings']);
 		$data['settings']=Array();
-		$data['server']->Methods[]=$data['obj'];
+		$server->Methods[]=$data['obj'];
 		return true;
 	}
 }

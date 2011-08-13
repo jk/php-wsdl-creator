@@ -162,16 +162,16 @@ class PhpWsdlHash{
 	/**
 	 * The value
 	 * 
-	 * @var unknown_type
+	 * @var mixed
 	 */
 	public $Value;
 
 	/**
 	 * Constructor
 	 * 
-	 * @pw_omitfnc
+	 * @ignore
 	 * @param string $key The key
-	 * @param unknown_type $value The value
+	 * @param mixed $value The value
 	 */
 	public function PhpWsdlHash($key,$value){
 		$this->Key=$key;

@@ -47,7 +47,7 @@ $soap=PhpWsdl::CreateInstance(
 				)
 			),
 			new PhpWsdlParam(
-				'ComplexTypeArrayDemoResult',
+				'return',
 				'stringArray'
 			)
 		),
@@ -60,7 +60,7 @@ $soap=PhpWsdl::CreateInstance(
 				)
 			),
 			new PhpWsdlParam(
-				'SayHelloResult',
+				'return',
 				'string'
 			)
 		),
@@ -108,7 +108,7 @@ $soap=PhpWsdl::CreateInstance(
 
 // Disable caching for demonstration
 ini_set('soap.wsdl_cache_enabled',0);	// Disable caching in PHP
-$soap->CacheTime=0;						// Disable caching in PhpWsdl
+PhpWsdl::$CacheTime=0;					// Disable caching in PhpWsdl
 
 // Run the SOAP server
 if($soap->IsWsdlRequested())

@@ -2,16 +2,77 @@ Note: See the diff in the respository for other changes that are not
 documented here. Only smaller changes that not seem to be very important will 
 stay undocumented.
 
-?: 2.1.1
+2011-08-13: 2.2
+Bugfix: Parsing the documentation couldn't be fully disabled
+Bugfix: The CacheTime property is static and should be handled as such in the 
+        demonstrations
 Changed: The AJAX proxy is now released
-Changed: The PhpWsdlParser will now handle class methods without public 
-         declaration
+Changed: The PhpWsdlParser will now handle class methods without an explicit 
+         public declaration
+Changed: The return part is named "return". This change needs your clients to 
+         update their SOAP proxies f.e. This change was required to be 
+         compatible to the PHPs SoapServer response when not using WSDL. But 
+         you can change it back to the old behavior by setting another name in 
+         the PhpWsdlParam::$DefaultReturnName
+Changed: WSDL element classes are now responsibly for creating the HTML 
+         documentation output
+Changed: A file named "class.webservice.php" may be in the current folder OR 
+         in the same folder as the file "class.phpwsdl.php" exists
+Changed: An array can be defined without a name restriction just by adding [] 
+         to the type name. The "Array" type name postfix can be disabled by 
+         setting the PhpWsdlComplex::$DisableArrayPostfix to TRUE
+Changed: All PhpWsdl elements should extend the PhpWsdlObject class
+Changed: Caching of HTML (and PHP) output
+Changed: This version contains some caching improvements
+Changed: Cache files from other versions can't be used anymore
+New: PhpWsdl can handle htp Auth logins before running a SOAP server
+New: The xmlns namespaces for the target namespace and XSD can now be changed 
+     in the PhpWsdl::$Config configuration
+New: Added methods to format and optimize XML, also added a new class 
+     PhpWsdlFormatter
+New: The quick mode should be cone with the PhpWsdl::RunQuickMode method, the 
+     quick mode by giving TRUE to the constructor is deprecated and will be 
+     removed from version 3.0
 New: Extended PhpWsdl->TidyCache method allows to cleanup the cache folder: 
-     Only timed out cache files will be deleted.
+     Only timed out cache files can be deleted.
 New: Added support for writing a debug file
+New: Debugging messages may now contain a backtrace info from where the 
+     message has been sent
 New: Added xsd:anyType to the list of basic types
-New: Namespaces can be modified by changing the values of the 
+New: Namespaces in WSDL can be modified by changing the values of the 
      PhpWsdl::$NameSpaces property
+New: @ignore has the same meaning as @pw_omitfnc and can disable a complex 
+     type definition when inserted before the @pw_complex keyword in the same 
+     comment block
+New: Added the @service keyword to support a description for a webservice. The 
+     name of the webservice could be set with this keyword, too - usage:
+     "@service ServiceName"
+New: If you're only using global methods, you don't need to setup a webservice 
+     name (PhpWsdl will use "SoapWebService" in this case)
+New: Added support for global methods with "@pw_set global=1" in the comment 
+     block, or (to handle all methods as global per default) by setting the 
+     PhpWsdlMethod::$IsGlobalDefault to TRUE (see demo5.php)
+New: The PhpWsdlProxy can now be served with OR without WSDL (check the new 
+     PhpWsdl::$UseProxyWsdl property)
+New: Added a global method to demo3.php to demonstrate how to mix class and 
+     global methods within one webservice
+New: Added a list of non-nillable types as PhpWsdl::$NonNillable to determine 
+     the nillable flag for an complex type element based on its type
+New: PhpWsdl will use the folder "./cache", if it's writeable and you didn't 
+     define another cache folder. The second choice would be the systems 
+     temporary folder. If no folder is writeable, caching will be disabled
+New: Autorun in quick mode possible, if you change the source of 
+     class.phpwsdl.php and set the PhpWsdl::$AutoRun property to TRUE, or you 
+     set the global variable $PhpWsdlAutoRun to TRUE (see demo4/5.php for an 
+     example)
+New: The NuSOAP adapter is able to create a new PhpWsdl object with data from 
+     an existing NuSOAP server object
+New: PhpWsdl is able to create a documented PHP SOAP client class for a 
+     webservice
+New: Added a SOAP client class that can produce a PHP SOAP client from an WSDL 
+     URI with help of PhpWsdl (see demo6.php)
+Info: If you used the hooks for creating the HTML documentation, you need to 
+      update your code to be compatible with the changes in this version!
 
 2011-08-01: 2.1
 Bugfix: @pw_omit should be @pw_omitfnc in class.phpwsdlhash.php

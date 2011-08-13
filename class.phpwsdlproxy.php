@@ -20,53 +20,64 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
-// I tryed some document/literal experiments which required using this proxy 
-// because the PHP SoapServer can't handle document/literal SOAP requests.
-// You don't need this class to use PhpWsdl in standard.
-// BUT this proxy can handle missing parameters with NULL values. This will 
-// only work, if the PhpWsdl class doesn't promote the WSDL to the SoapServer. 
-// But then returning complex types won't be easy anymore: You have to encode 
-// the return value with PHPs SoapVar object by yourself.
-//
-// Note: You should NOT use the proxy class in PhpWsdl quick mode!
+// This proxy can handle missing parameters with NULL values. This will only 
+// work, if the PhpWsdl class doesn't promote the WSDL to the SoapServer. But 
+// then returning complex types won't be easy anymore: You have to encode the 
+// return value with PHPs SoapVar object by yourself.
 
 class PhpWsdlProxy{
 	public function __call($method,$param){
 		if(PhpWsdl::$Debugging)
-			PhpWsdl::Debug('Proxy call method '.$method.': '.print_r($param));
-		// Need to parse the source to ensure that the types and methods arrays are present 
-		if(sizeof(PhpWsdl::$ProxyServer->Methods)<1)
-			PhpWsdl::$ProxyServer->CreateWsdl();
-		// Check for missing parameters
+			PhpWsdl::Debug('Proxy call method '.$method.': '.print_r($param,true));
+		PhpWsdl::$ProxyServer->CreateWsdl();
 		$m=PhpWsdl::$ProxyServer->GetMethod($method);
-		if(!is_null($m)){
+		if(is_null($m))
+			throw(new SoapFault('MissingMethod','Method "'.$method.'" not found'));
+		// Try to fix the missing parameters issue if the SoapServer is not running in WSDL mode
+		if(!PhpWsdl::$UseProxyWsdl){
 			$pLen=sizeof($m->Param);
-			if($pLen!=sizeof($param)){
-				$req=file_get_contents('php://input');
-				$temp=$param;
-				$param=Array();
-				$pos=0;// Current index in the received parameter array
-				$i=-1;
-				PhpWsdl::Debug('Add NULL parameters');
-				while(++$i<$pLen)//FIXME This regular expression is not very reliably in some cases when working with complex types
-					if(preg_match('/<([^>]+:)?'.$m->Param[$i]->Name.'>/',$req)){
-						// Parameter received -> use received value
-						$param[]=$temp[$pos];
-						$pos++;
-					}else{
-						// Missing parameter -> insert NULL value
-						PhpWsdl::Debug($m->Param[$i]->Name.' was missing');
-						$param[]=null;
+			$temp=sizeof($param);
+			if($pLen!=$temp){
+				PhpWsdl::Debug('Wrong parameter count ('.$temp.'/'.$pLen.')');
+				$req=new DOMDocument();
+				if($req->loadXml(file_get_contents('php://input'))){
+					$x=new DOMXPath($req);
+					$temp=$param;
+					$param=Array();
+					$pos=0;// Current index in the received parameter array
+					$i=-1;
+					while(++$i<$pLen){
+						$p=$m->Param[$i];
+						if($x->query("/*[local-name()='Envelope']/*[local-name()='Body']/*[local-name()='".$m->Name."']/*[local-name()='".$p->Name."']")->length>0){
+							PhpWsdl::Debug('Parameter "'.$p->Name.'" was received');
+							$param[]=$temp[$pos];
+							$pos++;
+						}else{
+							PhpWsdl::Debug('Parameter "'.$p->Name.'" was missing');
+							$param[]=null;
+						}
 					}
+				}else{
+					PhpWsdl::Debug('Could not parse SOAP request XML');
+				}
 			}
 		}
-		// Call the target method and return the response
-		return call_user_func_array(
-			Array(
+		// Prepare the method call
+		$call=($m->IsGlobal)
+			?$method					// Global method
+			:Array(						// Class method
 				PhpWsdl::$ProxyObject,
 				$method
-			),
-			$param
-		);
+			);
+		// Call the target method and return the response
+		PhpWsdl::Debug('Call the target method');
+		return (sizeof($param)<1)
+			?call_user_func(
+					$call
+				)
+			:call_user_func_array(
+					$call,
+					$param
+				);
 	}
 }
