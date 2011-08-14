@@ -50,7 +50,7 @@ PhpWsdl::PostInit();
  * 
  * @author Andreas Zimmermann
  * @copyright ©2011 Andreas Zimmermann, wan24.de
- * @version 2.2
+ * @version 2.2.1
  */
 class PhpWsdl{
 	/**
@@ -58,7 +58,7 @@ class PhpWsdl{
 	 * 
 	 * @var string
 	 */
-	public static $VERSION='2.2';
+	public static $VERSION='2.2.1';
 	/**
 	 * Set this to TRUE to enable the autorun in quick mode
 	 * 
@@ -730,6 +730,7 @@ class PhpWsdl{
 	public function IsFileInList($file){
 		$file=preg_quote(basename($file));
 		$i=-1;
+		$fLen=sizeof($this->Files);
 		while(++$i<$fLen)
 			if(preg_match('/^(.*\/)?'.$file.'$/i',$this->Files[$i]))
 				return true;
