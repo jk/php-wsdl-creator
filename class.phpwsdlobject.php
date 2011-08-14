@@ -44,6 +44,12 @@ class PhpWsdlObject{
 	 * @var string
 	 */
 	public $Docs=null;
+	/**
+	 * Other settings
+	 * 
+	 * @var array
+	 */
+	public $Settings=null;
 	
 	/**
 	 * Constructor
@@ -55,8 +61,11 @@ class PhpWsdlObject{
 		$this->GUID=uniqid();
 		PhpWsdl::Debug('New PhpWsdlObject "'.$name.'" with GUID "'.$this->GUID.'"');
 		$this->Name=$name;
-		if(!is_null($settings))
+		if(!is_null($settings)){
 			if(isset($settings['docs']))
 				$this->Docs=$settings['docs'];
+			if(isset($settings['settings']))
+				$this->Settings=$settings['settings'];
+		}
 	}
 }

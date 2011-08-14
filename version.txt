@@ -2,6 +2,10 @@ Note: See the diff in the respository for other changes that are not
 documented here. Only smaller changes that not seem to be very important will 
 stay undocumented.
 
+?: 2.3
+Bugfix: PhpWsdl->IsFileInList did not declare the variable $fLen
+New: Run JSON, http or REST  webservices with the servers extension
+
 2011-08-13: 2.2
 Bugfix: Parsing the documentation couldn't be fully disabled
 Bugfix: The CacheTime property is static and should be handled as such in the 
