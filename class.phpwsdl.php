@@ -50,7 +50,7 @@ PhpWsdl::PostInit();
  * 
  * @author Andreas Zimmermann
  * @copyright ©2011 Andreas Zimmermann, wan24.de
- * @version 2.2.1
+ * @version 2.2.2
  */
 class PhpWsdl{
 	/**
@@ -58,7 +58,7 @@ class PhpWsdl{
 	 * 
 	 * @var string
 	 */
-	public static $VERSION='2.2.1';
+	public static $VERSION='2.2.2';
 	/**
 	 * Set this to TRUE to enable the autorun in quick mode
 	 * 

@@ -225,6 +225,8 @@ class PhpWsdlComplex extends PhpWsdlObject{
 			return true;
 		$server=$data['server'];
 		$name=$info[0];
+		PhpWsdl::Debug('Interpret complex type "'.$name.'"');
+		$type=null;
 		$docs=null;
 		if(strpos($name,'[]')>-1){
 			if(sizeof($info)<2){
@@ -240,19 +242,24 @@ class PhpWsdlComplex extends PhpWsdlObject{
 			if($server->ParseDocs)
 				if(sizeof($info)>2)
 					$docs=$info[2];
+			PhpWsdl::Debug('Array "'.$name.'" type of "'.$type.'" definition');
 		}else{
 			if(!is_null($server->GetType($name))){
 				PhpWsdl::Debug('WARNING: Double type detected!');
 				return true;
 			}
-			$type=substr($name,0,strlen($name)-5);
+			if(!self::$DisableArrayPostfix&&substr($name,strlen($name)-5)=='Array'){
+				$type=substr($name,0,strlen($name)-5);
+				PhpWsdl::Debug('Array "'.$name.'" type of "'.$type.'" definition');
+			}else{
+				PhpWsdl::Debug('Complex type definition');
+			}
 			if($server->ParseDocs){
 				$temp=sizeof($info);
 				if($temp>1)
 					$docs=($temp>2)?$info[1].' '.$info[2]:$info[1];
 			}
 		}
-		PhpWsdl::Debug('Interpreted complex type '.$info[0]);
 		$data['type']=Array(
 			'id'			=>	'complex',
 			'name'			=>	$name,

@@ -2,7 +2,10 @@ Note: See the diff in the respository for other changes that are not
 documented here. Only smaller changes that not seem to be very important will 
 stay undocumented.
 
-2011-08-14: 2.21.1
+2011-08-15: 2.2.2
+Bugfix: PhpWsdlComplex interpreted all types as array
+
+2011-08-14: 2.2.1
 Bugfix: PhpWsdl->IsFileInList did not declare the variable $fLen
 
 2011-08-13: 2.2
