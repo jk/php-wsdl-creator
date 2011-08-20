@@ -294,6 +294,12 @@ class PhpWsdl{
 	 */
 	public $ForceNotOutputHtml=false;
 	/**
+	 * The headline for the HTML output or NULL to use the default
+	 * 
+	 * @var string
+	 */
+	public $HtmlHeadLine=null;
+	/**
 	 * Force sending PHP (has a higher priority than PhpWsdl->ForceNotOutputPhp)
 	 * 
 	 * @var boolean
@@ -1202,7 +1208,7 @@ class PhpWsdl{
 		$res=Array();
 		$res[]='<html>';
 		$res[]='<head>';
-		$res[]='<title>'.$this->Name.' interface description</title>';
+		$res[]='<title>'.((is_null($this->HtmlHeadLine))?$this->Name.' interface description':nl2br(htmlentities($this->HtmlHeadLine))).'</title>';
 		$res[]='<style type="text/css" media="all">';
 		$res[]='body{font-family:Calibri,Arial;background-color:#fefefe;}';
 		$res[]='.pre{font-family:Courier;}';
@@ -1285,23 +1291,23 @@ class PhpWsdl{
 		// HTML2PDF link
 		$param=Array(
 			'plain'			=>	'1',
-			'filename'		=>	$this->Name.'-SOAP.pdf',
+			'filename'		=>	$this->Name.'-webservices.pdf',
 			'print'			=>	'1'
 		);
 		if(!is_null(self::$HTML2PDFLicenseKey)){
 			// Use advanced HTML2PDF API
 			$temp=array_merge(self::$HTML2PDFSettings,Array(
-				'url'			=>	(is_null($this->DocUri))?$this->EndPoint:$this->DocUri
+				'url'			=>	$this->GetDocUri()
 			));
 			if($temp['attachments']=='1'){
-				$temp['attachment_1']=$this->Name.'.wsdl:'.((is_null($this->WsdlUri))?$this->EndPoint.'?WSDL':$this->WsdlUri);
+				$temp['attachment_1']=$this->Name.'.wsdl:'.$this->GetWsdlUri();
 				$cnt=1;
 				if($this->ParseDocs&&$this->IncludeDocs){
 					$cnt=2;
-					$temp['attachment_2']=$this->Name.'-doc.wsdl:'.((is_null($this->WsdlUri))?$this->EndPoint.'?WSDL':$this->WsdlUri).'&readable';
+					$temp['attachment_2']=$this->Name.'-doc.wsdl:'.$this->GetWsdlUri().'&readable';
 				}
 				$cnt++;
-				$temp['attachment_'.$cnt]=$this->Name.'.soapclient.php:'.((is_null($this->PhpUri))?$this->EndPoint.'?PHPSOAPCLIENT':$this->PhpUri);
+				$temp['attachment_'.$cnt]=$this->Name.'.soapclient.php:'.$this->GetPhpUri();
 				self::CallHook(
 					'PdfAttachmentHook',
 					Array(
@@ -1371,10 +1377,10 @@ class PhpWsdl{
 		$server=$data['server'];
 		$res[]='<h1>'.$server->Name.' SOAP WebService interface description</h1>';
 		$res[]='<p>Endpoint URI: <span class="pre">'.$server->EndPoint.'</span></p>';
-		$res[]='<p>WSDL URI: <span class="pre"><a href="'.$server->EndPoint.'?WSDL&readable">'.$server->EndPoint.'?WSDL</a></span></p>';
-		$res[]='<p>PHP SOAP client download URI: <span class="pre"><a href="'.$server->EndPoint.'?PHPSOAPCLIENT">'.$server->EndPoint.'?PHPSOAPCLIENT</a></span></p>';
+		$res[]='<p>WSDL URI: <span class="pre"><a href="'.$server->GetWsdlUri().'&readable">'.$server->GetWsdlUri().'</a></span></p>';
+		$res[]='<p>PHP SOAP client download URI: <span class="pre"><a href="'.$server->GetPhpUri().'">'.$server->GetPhpUri().'</a></span></p>';
 		if(self::$HTML2PDFSettings['attachments']=='1'&&!is_null(self::$HTML2PDFLicenseKey))
-			$res[]='<p class="print">The WSDL files and a PHP SOAP client proxy class are attached to this PDF documentation.</p>';
+			$res[]='<p class="print">The WSDL files and client proxy class(es) are attached to this PDF documentation.</p>';
 		if(!is_null($server->Docs))
 			$res[]='<p>'.nl2br(htmlentities($server->Docs)).'</p>';
 		return true;
@@ -1530,22 +1536,36 @@ class PhpWsdl{
 		)
 			return '';
 		// Options
+		$hasOptions=sizeof(array_keys($options))>0;
 		if(!isset($options['class']))
 			$options['class']=$this->Name.'SoapClient';
 		if(!isset($options['openphp']))
 			$options['openphp']=true;
 		if(!isset($options['phpclient']))
 			$options['phpclient']=true;
+		$data=Array(
+			'server'		=>	$this,
+			'withHeaders'	=>	&$withHeaders,
+			'echo'			=>	&$echo,
+			'options'		=>	&$options,
+			'res'			=>	&$res
+		);
 		// Header
 		if($withHeaders){
 			header('Content-Type: text/plain; charset=UTF-8',true);
-			header('Content-Disposition: attachment; filename='.$this->Name.'SoapClient.php');
+			header('Content-Disposition: attachment; filename='.$options['class'].'.php');
 		}
-		$this->GetWsdlFromCache();
-		if(!is_null($this->PHP)){
-			if($echo)
-				echo $this->PHP;
-			return $this->PHP;
+		if(!$hasOptions){
+			if(is_null($this->PHP))
+				$this->GetWsdlFromCache();
+			if(!is_null($this->PHP)){
+				if($echo)
+					echo $this->PHP;
+				return $this->PHP;
+			}
+		}else if(isset($options['php'])&&!is_null($options['php'])){
+			echo $options['php'];
+			return $options['php'];
 		}
 		$res=Array();
 		if($options['openphp'])
@@ -1570,16 +1590,7 @@ class PhpWsdl{
 		$res[]="\t * @var object";
 		$res[]="\t */";
 		$res[]="\tpublic static \$_Server=null;";
-		self::CallHook(
-			'BeginCreatePhpHook',
-			Array(
-				'server'		=>	$this,
-				'withHeaders'	=>	&$withHeaders,
-				'echo'			=>	&$echo,
-				'options'		=>	&$options,
-				'res'			=>	&$res
-			)
-		);
+		self::CallHook('BeginCreatePhpHook',$data);
 		$res[]='';
 		$res[]="\t/**";
 		$res[]="\t * Send a SOAP request to the server";
@@ -1589,17 +1600,7 @@ class PhpWsdl{
 		$res[]="\t * @return mixed The server response";
 		$res[]="\t */";
 		$res[]="\tpublic static function _Call(\$method,\$param){";
-		if(self::CallHook(
-				'CreatePhpCallHook',
-				Array(
-					'server'		=>	$this,
-					'withHeaders'	=>	&$withHeaders,
-					'echo'			=>	&$echo,
-					'options'		=>	&$options,
-					'res'			=>	&$res
-				)
-			)
-		){
+		if(self::CallHook('CreatePhpCallHook',$data)){
 			$res[]="\t\tif(is_null(self::\$_Server))";
 			if($options['phpclient']){
 				$res[]="\t\t\tself::\$_Server=new SoapClient(self::\$_WsdlUri);";
@@ -1615,7 +1616,7 @@ class PhpWsdl{
 		$len=sizeof($this->Methods);
 		while(++$i<$len){
 			$res[]='';
-			$res[]=$this->Methods[$i]->CreateMethodPhp($this);
+			$this->Methods[$i]->CreateMethodPhp($data);
 		}
 		$res[]="}";
 		// Types
@@ -1623,22 +1624,16 @@ class PhpWsdl{
 		$len=sizeof($this->Types);
 		while(++$i<$len){
 			$res[]='';
-			$res[]=$this->Types[$i]->CreateTypePhp($this);
+			$this->Types[$i]->CreateTypePhp($data);
 		}
-		self::CallHook(
-			'EndCreatePhpHook',
-			Array(
-				'server'		=>	$this,
-				'withHeaders'	=>	&$withHeaders,
-				'echo'			=>	&$echo,
-				'options'		=>	&$options,
-				'res'			=>	&$res
-			)
-		);
+		self::CallHook('EndCreatePhpHook',$data);
 		$res=utf8_encode(implode("\n",$res));
-		$this->PHP=$res;
-		if($cache)
-			$this->WriteWsdlToCache(null,null,null,true);
+		if(!$hasOptions){
+			if(is_null($this->PHP))
+				$this->PHP=$res;
+			if($cache)
+				$this->WriteWsdlToCache(null,null,null,true);
+		}
 		if($echo)
 			echo $res;
 		return $res;
@@ -1874,6 +1869,33 @@ class PhpWsdl{
 	}
 	
 	/**
+	 * Get the WSDL download URI
+	 * 
+	 * @return string The Uri
+	 */
+	public function GetWsdlUri(){
+		return ((is_null($this->WsdlUri))?$this->EndPoint:$this->WsdlUri).'?WSDL';
+	}
+	
+	/**
+	 * Get the PHP download URI
+	 * 
+	 * @return string The URI
+	 */
+	public function GetPhpUri(){
+		return ((is_null($this->PhpUri))?$this->EndPoint:$this->PhpUri).'?PHPSOAPCLIENT';
+	}
+	
+	/**
+	 * Get the HTML documentation URI
+	 * 
+	 * @return string The Uri
+	 */
+	public function GetDocUri(){
+		return (is_null($this->PhpUri))?$this->EndPoint:$this->DocUri;
+	}
+	
+	/**
 	 * Find a method
 	 * 
 	 * @param string $name The method name
@@ -1992,11 +2014,9 @@ class PhpWsdl{
 			$this->DocUri=$data['docuri'];
 			self::CallHook(
 				'ReadCacheHook',
-				array_merge(
-					$data,
-					Array(
-						'server'		=>	$this
-					)
+				Array(
+					'server'		=>	$this,
+					'data'			=>	&$data
 				)
 			);
 			if($data['version']!=self::$VERSION){
@@ -2087,11 +2107,9 @@ class PhpWsdl{
 		);
 		self::CallHook(
 			'WriteCacheHook',
-			array_merge(
-				$data,
-				Array(
-					'server'		=>	$this
-				)
+			Array(
+				'server'		=>	$this,
+				'data'			=>	&$data
 			)
 		);
 		if(file_put_contents($file.'.obj',serialize($data))===false){
@@ -2268,7 +2286,7 @@ class PhpWsdl{
 	 */
 	public static function CallHook($name,$data=null){
 		self::Debug('Call hook '.$name);
-		if(!isset(self::$Config['extensions'][$name]))
+		if(!self::HasHookHandler($name))
 			return true;
 		$keys=array_keys(self::$Config['extensions'][$name]);
 		$i=-1;
@@ -2286,15 +2304,24 @@ class PhpWsdl{
 	/**
 	 * Register a hook
 	 * 
-	 * @param string $jook The hook name
+	 * @param string $hook The hook name
 	 * @param string $name The call name
 	 * @param mixed $data The hook call data
 	 */
 	public static function RegisterHook($hook,$name,$data){
-		if(!isset(self::$Config['extensions'][$hook]))
+		if(!self::HasHookHandler($hook))
 			self::$Config['extensions'][$hook]=Array();
-		if(self::$Debugging)
-			self::Debug('Register hook '.$hook.' handler '.$name.': '.print_r($data,true));
+		if(self::$Debugging){
+			$handler=$data;
+			if(is_array($handler)){
+				$class=$handler[0];
+				$method=$handler[1];
+				if(is_object($class))
+					$class=get_class($class);
+				$handler=$class.'.'.$method;
+			}
+			self::Debug('Register hook '.$hook.' handler '.$name.': '.$handler);
+		}
 		self::$Config['extensions'][$hook][$name]=$data;
 	}
 	
@@ -2305,7 +2332,7 @@ class PhpWsdl{
 	 * @param string $name The call name or NULL to unregister the whole hook
 	 */
 	public static function UnregisterHook($hook,$name=null){
-		if(!isset(self::$Config['extensions'][$hook]))
+		if(!self::HasHookHandler($hook))
 			return;
 		if(!is_null($name)){
 			if(!isset(self::$Config['extensions'][$hook][$name]))
@@ -2317,6 +2344,18 @@ class PhpWsdl{
 		unset(self::$Config['extensions'][$hook][$name]);
 		if(self::$Debugging)
 			self::Debug('Unregister hook '.$hook.' handler '.$name);
+		if(sizeof(self::$Config['extensions'][$hook])<1)
+			unset(self::$Config['extensions'][$hook]);
+	}
+	
+	/**
+	 * Determine if a hook has a registered handler
+	 * 
+	 * @param string $hook The hook name
+	 * @return boolean Has handler?
+	 */
+	public static function HasHookHandler($hook){
+		return isset(self::$Config['extensions'][$hook]);
 	}
 	
 	/**

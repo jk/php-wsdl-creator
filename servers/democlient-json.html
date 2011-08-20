@@ -1,0 +1,47 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>JSON webservice client demonstration</title>
+
+<!-- In this demo we load the JavaScript JSON client proxy class directly from the webservice -->
+<script type="text/javascript" src="demoserver.php?JSJSONCLIENT"></script>
+
+<!-- This would load the compressed JavaScript JSON client proxy class -->
+<!-- <script type="text/javascript" src="demoserver.js?JSJSONCLIENT&min"></script> -->
+
+<script type="text/javascript">
+// The runDemo method will be called at the onLoad browser event
+function runDemo(){
+	try{
+		// Create an instance of the client proxy class
+		var client=new SoapDemoJsonClient();
+		// Call the method "SayHello"
+		alert(client.SayHello('you'));
+		// Create an object with the "GetComplexType" method and change a property
+		var res=client.GetComplexType();
+		res.StringB='test';
+		// Print the object with the "PrintComplexType" method
+		alert(client.PrintComplexType(res));
+		// Call the method "SayHello" in asynchron AJAX mode
+		client.SayHello('you',SayHelloCallback);
+	}catch(ex){
+		// This should never happen...
+		alert('Error: '+ex.message);
+	}
+}
+
+// This is the callback method for the SayHello asynchron call
+function SayHelloCallback(res){
+	alert(res);
+}
+</script>
+
+</head>
+
+<!-- Call the runDemo method at the onLoad Browser event and let the user to run the demo again by clicking on a link -->
+<body onload="runDemo();">
+<p><a href="javascript:runDemo();">Run the demo again</a></p>
+</body>
+
+</html>

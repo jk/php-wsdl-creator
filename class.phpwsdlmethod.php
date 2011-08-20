@@ -257,16 +257,20 @@ class PhpWsdlMethod extends PhpWsdlObject{
 		// Return value documentation
 		if(!is_null($m->Return)&&!is_null($m->Return->Docs))
 			$m->Return->CreateReturnHtml($data);
+		PhpWsdl::CallHook(
+			'CreateMethodHtmlHook',
+			$data
+		);
 	}
 	
 	/**
 	 * Create method PHP
 	 * 
-	 * @param PhpWsdl $server The PhpWsdl object
-	 * @return string PHP code
+	 * @param array $data The event data
 	 */
-	public function CreateMethodPhp($server){
-		$res=Array();
+	public function CreateMethodPhp($data){
+		$server=$data['server'];
+		$res=&$data['res'];
 		$res[]="\t/**";
 		if(!is_null($this->Docs)){
 			$res[]="\t * ".implode("\n\t * ",explode("\n",$this->Docs));
@@ -285,12 +289,22 @@ class PhpWsdlMethod extends PhpWsdlObject{
 		}
 		$res[]="\t */";
 		$res[]="\tpublic function ".$this->Name."(".implode(',',$param)."){";
-		$res[]="\t\treturn self::_Call('".$this->Name."',Array(";
-		if($pLen>0)
-			$res[]="\t\t\t".implode(",\n\t\t\t",$param);
-		$res[]="\t\t));";
+		if(PhpWsdl::CallHook(
+				'CreateMethodPhpHook',
+				array_merge(
+					$data,
+					Array(
+						'method'		=>	$this
+					)
+				)
+			)
+		){
+			$res[]="\t\treturn self::_Call('".$this->Name."',Array(";
+			if($pLen>0)
+				$res[]="\t\t\t".implode(",\n\t\t\t",$param);
+			$res[]="\t\t));";
+		}
 		$res[]="\t}";
-		return implode("\n",$res);
 	}
 	
 	/**

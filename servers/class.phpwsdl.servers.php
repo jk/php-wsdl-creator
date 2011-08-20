@@ -29,22 +29,24 @@ PhpWsdl::RegisterHook('RunServerHook','servers','PhpWsdlServers::RunServerHook')
 PhpWsdl::RegisterHook('BeginCreatePhpHook','servers','PhpWsdlServers::BeginCreatePhpHook');
 PhpWsdl::RegisterHook('OutputPhpHook','servers','PhpWsdlServers::OutputPhpHook');
 PhpWsdl::RegisterHook('CreatePhpCallHook','servers','PhpWsdlServers::CreatePhpCallHook');
+PhpWsdl::RegisterHook('CreateMethodPhpHook','servers','PhpWsdlServers::CreateMethodPhpHook');
 PhpWsdl::RegisterHook('CreateHtmlGeneralHook','servers','PhpWsdlServers::CreateHtmlGeneralHook');
+PhpWsdl::RegisterHook('CreateMethodHtmlHook','servers','PhpWsdlServers::CreateMethodHtmlHook');
 PhpWsdl::RegisterHook('PdfAttachmentHook','servers','PhpWsdlServers::PdfAttachmentHook');
+PhpWsdl::RegisterHook('CreateInstanceHook','servers','PhpWsdlServers::ConstructorHook');
 
 /**
- * Some http protocol servers (JSON, http and REST)
+ * Some http protocol servers (JSON, http, REST and XML RPC)
  * 
  * @author Andreas Zimmermann, wan24.de
- * @version 2.3
  */
 class PhpWsdlServers{
 	/**
-	 * The version number
+	 * The GUID
 	 * 
 	 * @var string
 	 */
-	public static $VERSION='2.3';
+	public $GUID;
 	/**
 	 * Disable the client cache?
 	 * 
@@ -70,6 +72,41 @@ class PhpWsdlServers{
 	 */
 	public static $EnableRest=true;
 	/**
+	 * Enable the RPC server
+	 * 
+	 * @var boolean
+	 */
+	public static $EnableRpc=true;
+	/**
+	 * Enable parameter names in XML RPC requests?
+	 * 
+	 * @var boolean
+	 */
+	public static $EnableRpcNamedParameters=false;
+	/**
+	 * Is this an RPC request?
+	 * 
+	 * @var boolean|NULL
+	 */
+	private static $IsRpcRequest=null;
+	/**
+	 * The server object that will be used to run the server
+	 * 
+	 * @var PhpWsdlServers
+	 */
+	public static $UseServer=null;
+	/**
+	 * Attach JavaScript to PDF?
+	 * 
+	 * Note: JavaScript can be attached, but the user can't save JavaScript attachments with 
+	 * Adobe Acrobat Reader per default. To open them from Windows the registry at (f.e.) 
+	 * HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Adobe\Adobe Reader\[VERSION]\FeatureLockDown\cDefaultLaunchAttachmentPerms 
+	 * has to be touched manually!
+	 * 
+	 * @var boolean
+	 */
+	public static $AttachJsInPdf=false;
+	/**
 	 * The webservice handler class name
 	 * 
 	 * @var string
@@ -88,11 +125,143 @@ class PhpWsdlServers{
 	 */
 	public $Server=null;
 	/**
-	 * The URI to the PHP client proxy download
+	 * The cached PHP http client proxy
 	 * 
 	 * @var string
 	 */
-	public $PhpUri=null;
+	public $HttpPhp=null;
+	/**
+	 * Set this to the PHP URI, if it's different from your SOAP endpoint + "?PHPHTTPCLIENT"
+	 * 
+	 * @var string
+	 */
+	public $HttpPhpUri=null;
+	/**
+	 * Force sending HTTP PHP (has a higher priority than PhpWsdlServers->ForceNotOutputHttpPhp)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceOutputHttpPhp=false;
+	/**
+	 * Force NOT sending HTTP PHP (disable sending HTTP PHP)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceNotOutputHttpPhp=false;
+	/**
+	 * The cached PHP JSON client proxy
+	 * 
+	 * @var string
+	 */
+	public $JsonPhp=null;
+	/**
+	 * Set this to the PHP URI, if it's different from your SOAP endpoint + "?PHPJSPNCLIENT"
+	 * 
+	 * @var string
+	 */
+	public $JsonPhpUri=null;
+	/**
+	 * Force sending JSON PHP (has a higher priority than PhpWsdlServers->ForceNotOutputJsonPhp)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceOutputJsonPhp=false;
+	/**
+	 * Force NOT sending JSON PHP (disable sending JSON PHP)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceNotOutputJsonPhp=false;
+	/**
+	 * The cached PHP REST client proxy
+	 * 
+	 * @var string
+	 */
+	public $RestPhp=null;
+	/**
+	 * Set this to the PHP URI, if it's different from your SOAP endpoint + "?PHPRESTCLIENT"
+	 * 
+	 * @var string
+	 */
+	public $RestPhpUri=null;
+	/**
+	 * Force sending REST PHP (has a higher priority than PhpWsdlServers->ForceNotOutputRestPhp)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceOutputRestPhp=false;
+	/**
+	 * Force NOT sending REST PHP (disable sending REST PHP)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceNotOutputRestPhp=false;
+	/**
+	 * The cached PHP XML RPC client proxy
+	 * 
+	 * @var string
+	 */
+	public $RpcPhp=null;
+	/**
+	 * Set this to the PHP URI, if it's different from your SOAP endpoint + "?PHPRPCCLIENT"
+	 * 
+	 * @var string
+	 */
+	public $RpcPhpUri=null;
+	/**
+	 * Force sending XML RPC PHP (has a higher priority than PhpWsdlServers->ForceNotOutputRpcPhp)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceOutputRpcPhp=false;
+	/**
+	 * Force NOT sending XML RPC PHP (disable sending XML RPC PHP)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceNotOutputRpcPhp=false;
+	/**
+	 * The cached JavaScript JSON client proxy
+	 * 
+	 * @var string
+	 */
+	public $JsonJs=null;
+	/**
+	 * Set this to the JavaScript URI, if it's different from your SOAP endpoint + "?JSJSONCLIENT"
+	 * 
+	 * @var string
+	 */
+	public $JsonJsUri=null;
+	/**
+	 * Force sending JSON JS (has a higher priority than PhpWsdlServers->ForceNotOutputJsonJs)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceOutputJsonJs=false;
+	/**
+	 * Force NOT sending JSON JS (disable sending JSON JS)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceNotOutputJsonJs=false;
+	/**
+	 * The cached and compressed JavaScript JSON client proxy
+	 * 
+	 * @var string
+	 */
+	public $JsonJsMin=null;
+	/**
+	 * Force the JSON JS compression (has a higher priority than PhpWsdlServers->ForceNotJsonJsMin)
+	 * 
+	 * @var boolean
+	 */
+	public $ForceJsonJsMin=false;
+	/**
+	 * Force NOT JSON JS compression (disable compression)
+	 * 
+	 * @var booleean
+	 */
+	public $ForceNotJsonJsMin=false;
 	
 	/**
 	 * Constructor
@@ -100,7 +269,12 @@ class PhpWsdlServers{
 	 * @param PhpWsdl $server The PhpWsdl object
 	 */
 	public function PhpWsdlServers($server){
+		$this->GUID=uniqid();
+		PhpWsdl::Debug('New PhpWsdlServers "'.$this->GUID.'"');
 		$this->Server=$server;
+		self::$UseServer=$this;
+		PhpWsdl::RegisterHook('ReadCacheHook','servers',Array($this,'ReadCacheHook'));
+		PhpWsdl::RegisterHook('WriteCacheHook','servers',Array($this,'WriteCacheHook'));
 	}
 	
 	/**
@@ -109,7 +283,7 @@ class PhpWsdlServers{
 	 * @return boolean JSON request?
 	 */
 	public static function IsJsonRequest(){
-		return self::$EnableJson&&!self::HasParam('call')&&(self::HasParam('json')||self::HasParam('JSON'));
+		return self::$EnableJson&&function_exists('json_encode')&&!self::HasParam('call')&&(self::HasParam('json')||self::HasParam('JSON'));
 	}
 	
 	/**
@@ -131,12 +305,90 @@ class PhpWsdlServers{
 	}
 	
 	/**
+	 * Determine if the request is a RPC request
+	 * 
+	 * @return boolean RPC request?
+	 */
+	public static function IsRpcRequest(){
+		if(!self::$EnableRpc||!is_null(self::$IsRpcRequest))
+			return self::$EnableRpc&&self::$IsRpcRequest;
+		if(function_exists('xmlrpc_server_create')){
+			$in=file_get_contents('php://input');
+			$xml=new DOMDocument();
+			if($xml->loadXML($in)){
+				$x=new DOMXPath($xml);
+				$temp=$x->query('/*');
+				self::$IsRpcRequest=$temp->length>0&&$temp->item(0)->nodeName=='methodCall';
+			}else{
+				self::$IsRpcRequest=false;
+			}
+		}else{
+			self::$IsRpcRequest=false;
+		}
+		return self::$IsRpcRequest;
+	}
+	
+	/**
 	 * Determine if the PhpWsdlServers extension can handle this request
 	 * 
 	 * @return boolean Can handle?
 	 */
 	public static function CanHandleRequest(){
-		return self::IsHttpRequest()||self::IsJsonRequest()||self::IsRestRequest();
+		return 
+			self::IsHttpRequest()||
+			self::IsJsonRequest()||
+			self::IsRestRequest()||
+			self::IsRpcRequest()||
+			self::IsJsonPhpRequest()||
+			self::IsJsonJsRequest()||
+			self::IsHttpPhpRequest()||
+			self::IsRestPhpRequest()||
+			self::IsRpcPhpRequest();
+	}
+	
+	/**
+	 * Determine if the PHP JSON client proxy is requested
+	 * 
+	 * @return boolean Requested?
+	 */
+	public static function IsJsonPhpRequest(){
+		return self::$EnableJson&&(self::$UseServer->ForceOutputJsonPhp||((self::HasParam('phpjsonclient')||self::HasParam('PHPJSONCLIENT'))&&!self::$UseServer->ForceNotOutputJsonPhp));
+	}
+	
+	/**
+	 * Determine if the JavaScript JSON client proxy is requested
+	 * 
+	 * @return boolean Requested?
+	 */
+	public static function IsJsonJsRequest(){
+		return self::$EnableJson&&(self::$UseServer->ForceOutputJsonJs||((self::HasParam('jsjsonclient')||self::HasParam('JSJSONCLIENT'))&&!self::$UseServer->ForceNotOutputJsonJs));
+	}
+	
+	/**
+	 * Determine if the PHP XML RPC client proxy is requested
+	 * 
+	 * @return boolean Requested?
+	 */
+	public static function IsRpcPhpRequest(){
+		return self::$EnableRpc&&(self::$UseServer->ForceOutputRpcPhp||((self::HasParam('phprpcclient')||self::HasParam('PHPRPCCLIENT'))&&!self::$UseServer->ForceNotOutputRpcPhp));
+	}
+
+	/**
+	 * Determine if the PHP http client proxy is requested
+	 * 
+	 * @return boolean Requested?
+	 */
+	public static function IsHttpPhpRequest(){
+		return self::$EnableHttp&&(self::$UseServer->ForceOutputHttpPhp||((self::HasParam('phphttpclient')||self::HasParam('PHPHTTPCLIENT'))&&!self::$UseServer->ForceNotOutputHttpPhp));
+	}
+
+	/**
+	 * Determine if the PHP REST client proxy is requested
+	 * 
+	 * @return boolean Requested?
+	 */
+	public static function IsRestPhpRequest(){
+		return self::$EnableRest&&(self::$UseServer->ForceOutputRestPhp||((self::HasParam('phprestclient')||self::HasParam('PHPRESTCLIENT'))&&!self::$UseServer->ForceNotOutputRestPhp));
 	}
 	
 	/**
@@ -146,7 +398,66 @@ class PhpWsdlServers{
 	 * @return boolean Response
 	 */
 	public static function BeforeRunServerHook($data){
-		return !(self::HasParam('phpjsonclient')||self::HasParam('PHPJSONCLIENT')||self::CanHandleRequest());
+		if(!self::CanHandleRequest())
+			return true;
+		PhpWsdl::Debug('PhpWsdlServers will handle the request');
+		$server=$data['server'];
+		$server->GetWsdlFromCache();
+		$srv=self::$UseServer;
+		$jsonPhp=self::IsJsonPhpRequest();
+		$jsonJs=self::IsJsonJsRequest();
+		$rpcPhp=self::IsRpcPhpRequest();
+		$httpPhp=self::IsHttpPhpRequest();
+		$restPhp=self::IsRestPhpRequest();
+		if(!$jsonPhp&&!$jsonJs&&!$rpcPhp&&!$httpPhp&&!$restPhp)
+			return false;
+		if($jsonJs){
+			PhpWsdl::Debug('Output JavaScript requested');
+			$srv->OutputJs();
+		}else{
+			PhpWsdl::Debug('Output PHP requested');
+			$php=null;
+			if($jsonPhp){
+				$php=$srv->JsonPhp;
+				$ext='json';
+			}else if($rpcPhp){
+				$php=$srv->RpcPhp;
+				$ext='rpc';
+			}else if($httpPhp){
+				$php=$srv->HttpPhp;
+				$ext='http';
+			}else{
+				$php=$srv->RestPhp;
+				$ext='rest';
+			}
+			$cache=is_null($php);
+			$php=$server->OutputPhp(
+				true,
+				true,
+				Array(
+					'serversext'	=>	$ext
+				)
+			);
+			if($cache){
+				switch($ext){
+					case 'json':
+						$srv->JsonPhp=$php;
+						break;
+					case 'http':
+						$srv->HttpPhp=$php;
+						break;
+					case 'rest':
+						$srv->RestPhp=$php;
+						break;
+					case 'rpc':
+						$srv->RpcPhp=$php;
+						break;
+				}
+				$server->WriteWsdlToCache(null,null,null,true);
+			}
+		}
+		PhpWsdl::Debug('Quit script execution');
+		exit;
 	}
 	
 	/**
@@ -158,9 +469,9 @@ class PhpWsdlServers{
 	public static function PrepareServerHook($data){
 		if(!self::CanHandleRequest())
 			return true;
-		PhpWsdl::Debug('Prepare a JSON/http/REST server');
+		PhpWsdl::Debug('Prepare a JSON/http/REST/RPC server');
 		$server=&$data['server'];
-		$json=new PhpWsdlServers($server);
+		$json=self::$UseServer;
 		$data['soapserver']=$json;
 		$useProxy=&$data['useproxy'];
 		$class=&$data['class'];
@@ -186,13 +497,6 @@ class PhpWsdlServers{
 	 * @return boolean Response
 	 */
 	public static function RunServerHook($data){
-		if(self::HasParam('phpjsonclient')||self::HasParam('PHPJSONCLIENT')){
-			PhpWsdl::Debug('Create PHP client');
-			$data['server']->OutputPhp(true,true,Array(),false);
-			if($data['andexit'])
-				exit;
-			return false;
-		}
 		if(!self::CanHandleRequest())
 			return true;
 		if(get_class($data['soapserver'])!='PhpWsdlServers'){
@@ -200,13 +504,22 @@ class PhpWsdlServers{
 			return true;
 		}
 		PhpWsdl::Debug('Handle the request');
-		if(self::IsJsonRequest())
-			return $data['soapserver']->HandleJsonRequest();
-		if(self::IsHttpRequest())
+		if(self::IsJsonRequest()){
+			$res=$data['soapserver']->HandleJsonRequest();
+		}else if(self::IsHttpRequest()){
 			return $data['soapserver']->HandleHttpRequest();
-		if(self::IsRestRequest())
+		}else if(self::IsRestRequest()){
 			return $data['soapserver']->HandleRestRequest();
-		throw(new Exception('Could not handle request'));
+		}else if(self::IsRpcRequest()){
+			return $data['soapserver']->HandleRpcRequest();
+		}else{
+			throw(new Exception('Could not handle request'));
+		}
+		if($data['andexit']){
+			PhpWsdl::Debug('Stopping script execution');
+			exit;
+		}
+		return $res;
 	}
 	
 	/**
@@ -220,15 +533,14 @@ class PhpWsdlServers{
 			return true;
 		PhpWsdl::Debug('Interpret REST "'.$data['keyword'][1].'" for method "'.$data['method'].'"');
 		$info=explode(' ',$data['keyword'][1],3);
-		if(sizeof($info)<2){
+		$iLen=sizeof($info);
+		if($iLen<2){
 			PhpWsdl::Debug('Invalid REST definition');
 			return true;
 		}
 		$method=$info[0];
 		$path=$info[1];
-		$docs=null;
-		if(sizeof($info)>2)
-			$docs=$info[2];
+		$docs=($iLen>2)?$info[2]:null;
 		$settings=&$data['settings'];
 		if(!isset($settings['settings']))
 			$settings['settings']=Array();
@@ -253,19 +565,15 @@ class PhpWsdlServers{
 	 * @return boolean Response
 	 */
 	public static function BeginCreatePhpHook($data){
-		if(
-			!self::HasParam('phpjsonclient')&&
-			!self::HasParam('PHPJSONCLIENT')
-		)
+		if(!isset($data['options']['serversext']))
 			return true;
 		$res=&$data['res'];
-		$server=$data['server'];
 		$res[]="\t/**";
 		$res[]="\t * The endpoint URI";
 		$res[]="\t *";
 		$res[]="\t * @var string";
 		$res[]="\t */";
-		$res[]="\tpublic static \$_EndPoint='".$server->EndPoint."';";
+		$res[]="\tpublic static \$_EndPoint='".$data['server']->EndPoint."';";
 		return false;
 	}
 	
@@ -276,10 +584,26 @@ class PhpWsdlServers{
 	 * @return boolean Response
 	 */
 	public static function OutputPhpHook($data){
-		$options=&$data['options'];
-		$server=&$data['server'];
-		if(!isset($options['class']))
-			$options['class']=$server->Name.'JsonClient';
+		if(!isset($data['options']['serversext'])||isset($options['class']))
+			return true;
+		switch($data['options']['serversext']){
+			case 'http':
+				$ext='Http';
+				break;
+			case 'json':
+				$ext='Json';
+				break;
+			case 'rest':
+				$ext='Rest';
+				break;
+			case 'rpc':
+				$ext='XmlRpc';
+				break;
+			default:
+				return true;
+				break;
+		}
+		$data['options']['class']=$data['server']->Name.$ext.'Client';
 		return true;
 	}
 	
@@ -290,38 +614,200 @@ class PhpWsdlServers{
 	 * @return boolean Response
 	 */
 	public static function CreatePhpCallHook($data){
-		if(
-			(
-				!self::HasParam('phpjsonclient')&&
-				!self::HasParam('PHPJSONCLIENT')
-			)||
-			!self::$EnableJson
-		)
+		if(!isset($data['options']['serversext']))
 			return true;
-		PhpWsdl::Debug('Create PhpWsdlServers JSON PHP client code');
 		$res=&$data['res'];
-		$res[]="\t\t".'$call=Array(';
-		$res[]="\t\t\t".'"call"=>$method,';
-		$res[]="\t\t\t".'"param"=>$param';
-		$res[]="\t\t".');';
-		$res[]="\t\t".'return json_decode(file_get_contents($this->EndPoint."?JSON=".urlencode(json_encode($call))';
+		switch($data['options']['serversext']){
+			case 'json':
+				PhpWsdl::Debug('Create PhpWsdlServers JSON PHP client code');
+				$res[]="\t\t".'$call=Array(';
+				$res[]="\t\t\t".'"call"=>$method,';
+				$res[]="\t\t\t".'"param"=>$param';
+				$res[]="\t\t".');';
+				$res[]="\t\t".'return json_decode(file_get_contents(self::$_EndPoint."?JSON=".urlencode(json_encode($call))));';
+				break;
+			case 'rpc':
+				PhpWsdl::Debug('Create PhpWsdlServers XML RPC PHP client code');
+				$res[]="\t\t".'self::$_Server=stream_context_create(Array(';
+				$res[]="\t\t\t".'"http"			=>	Array(';
+				$res[]="\t\t\t\t".'"method"			=>	"POST",';
+				$res[]="\t\t\t\t".'"header"			=>	"Content-Type: text/xml",';
+				$res[]="\t\t\t\t".'"content"			=>	xmlrpc_encode_request($method,$param)';
+				$res[]="\t\t\t".')';
+				$res[]="\t\t".'));';
+				$res[]="\t\t".'$res=xmlrpc_decode(file_get_contents(self::$_EndPoint,false,self::$_Server));';
+				$res[]="\t\t".'if(is_array($res)&&xmlrpc_is_fault($res))';
+				$res[]="\t\t\t".'throw(new Exception($res["faultString"],$res["faultCode"]));';
+				$res[]="\t\t".'return $res;';
+				break;
+			case 'http':
+				PhpWsdl::Debug('Create PhpWsdlServers http PHP client code');
+				$res[]="\t\t".'$param["call"]=$method;';
+				$res[]="\t\t".'$temp=Array();';
+				$res[]="\t\t".'$keys=array_keys($param);';
+				$res[]="\t\t".'$i=-1;';
+				$res[]="\t\t".'$len=sizeof($keys);';
+				$res[]="\t\t".'while(++$i<$len)';
+				$res[]="\t\t\t".'$temp[]=urlencode($keys[$i])."=".urlencode($param[$keys[$i]]);';
+				$res[]="\t\t".'return file_get_contents(self::$_EndPoint."?".implode("&",$temp));';
+				break;
+			case 'rest':
+				PhpWsdl::Debug('Create PhpWsdlServers REST PHP client code');
+				$res[]="\t\t".'$keys=array_keys($param);';
+				$res[]="\t\t".'$i=-1;';
+				$res[]="\t\t".'$len=sizeof($keys);';
+				$res[]="\t\t".'while(++$i<$len)';
+				$res[]="\t\t\t".'$method=str_replace(" ".$keys[$i]."/",urlencode($param[$keys[$i]])."/",$method);';
+				$res[]="\t\t".'return file_get_contents(self::$_EndPoint.$method);';
+				break;
+			default:
+				return true;
+				break;
+		}
+		return false;
+	}
+
+	/**
+	 * Create PHP code for a method call
+	 * 
+	 * @param array $data The event data
+	 * @return boolean Response
+	 */
+	public static function CreateMethodPhpHook($data){
+		if(!isset($data['options']['serversext']))
+			return true;
+		$server=$data['server'];
+		$m=$data['method'];
+		$res=&$data['res'];
+		switch($data['options']['serversext']){
+			case 'rest':
+			case 'http':
+				PhpWsdl::Debug('Create PhpWsdlServers http/REST PHP method code');
+				$basicType=true;
+				if(!is_null($m->Return))
+					$basicType=in_array($m->Return->Type,PhpWsdl::$BasicTypes);
+				$pLen=sizeof($m->Param);
+				if($data['options']['serversext']!='rest'){
+					$name=$m->Name;
+				}else{
+					$temp=Array('/'.$m->Name);
+					$i=-1;
+					while(++$i<$pLen)
+						$temp[]=' '.$m->Param[$i]->Name;
+					$name=implode('/',$temp).'/';
+				}
+				$res[]="\t\treturn ".(($basicType)?"":"json_decode(")."self::_Call('".$name."',Array(";
+				$i=-1;
+				while(++$i<$pLen){
+					$p=$m->Param[$i];
+					$res[]="\t\t\t'".$p->Name."'=>".((in_array($p->Type,PhpWsdl::$BasicTypes))?"\$".$p->Name:"json_encode(\$".$p->Name.")");
+				}
+				$res[]="\t\t))".(($basicType)?"":")").";";
+				break;
+			case 'rpc':
+				if(!self::$EnableRpcNamedParameters)
+					return true;
+				PhpWsdl::Debug('Create PhpWsdlServers XML RPC PHP method code for named parameters');
+				$res[]="\t\treturn self::_Call('".$server->Name."',Array(";
+				$i=-1;
+				$len=sizeof($m->Param);
+				while(++$i<$len)
+					$res[]="\t\t\t".'"'.$m->Param[$i]->Name.'"=>$'.$m->Param[$i]->Name;
+				$res[]="\t\t));";
+				break;
+			default:
+				return true;
+				break;
+		}
 		return false;
 	}
 	
 	/**
-	 * Extend HTML documentation
+	 * Extend general HTML documentation
 	 * 
 	 * @param array $data The event data
 	 * @return boolean Response
 	 */
 	public static function CreateHtmlGeneralHook($data){
-		if(!self::$EnableJson)
+		if(!self::$EnableHttp&&!self::$EnableJson&&!self::$EnableRest&&!self::$EnableRpc)
 			return true;
 		PhpWsdl::Debug('Append HTML general information with PhpWsdlServers information');
+		$server=$data['server'];
+		$res=&$data['res'];
+		$temp=Array('SOAP');
+		if(self::$EnableJson){
+			$temp[]='JSON';
+			$url=self::$UseServer->GetJsonPhpUri();
+			$res[]='<p>PHP JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+			$url=self::$UseServer->GetJsonJsUri();
+			$res[]='<p>JavaScript JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+			if(self::IsJsPackerAvailable()){
+				$url=self::$UseServer->GetJsonJsUri().'&min';
+				$res[]='<p>Compressed JavaScript JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+			}
+		}
+		if(self::$EnableRpc){
+			$temp[]='XML RPC';
+			$url=self::$UseServer->GetRpcPhpUri();
+			$res[]='<p>PHP XML RPC client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+		}
+		if(self::$EnableHttp){
+			$temp[]='http';
+			$url=self::$UseServer->GetHttpPhpUri();
+			$res[]='<p>PHP http client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+		}
+		if(self::$EnableRest){
+			$temp[]='REST';
+			$url=self::$UseServer->GetRestPhpUri();
+			$res[]='<p>PHP REST client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+		}
+		if(sizeof($temp)>1)
+			$res[]='<p>The PhpWsdlServers extension allows PhpWsdl to serve these protocols: '.implode(', ',$temp).'</p>';
+		return true;
+	}
+
+	/**
+	 * Extend method HTML documentation
+	 * 
+	 * @param array $data The event data
+	 * @return boolean Response
+	 */
+	public static function CreateMethodHtmlHook($data){
+		if(!self::$EnableRest)
+			return true;
+		PhpWsdl::Debug('Append HTML method information with PhpWsdlServers information');
 		$res=&$data['res'];
 		$server=$data['server'];
-		$url=$server->EndPoint.'?PHPJSONCLIENT';
-		$res[]='<p>PHP JSON client download URI: <a href="'.$url.'">'.$url.'</a></p>';
+		$m=$data['method'];
+		if(!is_null($m->Settings))
+			if(isset($m->Settings['rest'])){
+				$temp=$m->Settings['rest'];
+				$keys=array_keys($temp);
+				$i=-1;
+				$len=sizeof($keys);
+				while(++$i<$len){
+					$method=$keys[$i];
+					$rest=$temp[$keys[$i]];
+					$rTemp=Array();
+					$j=-1;
+					$rLen=sizeof($rest);
+					while(++$j<$rLen){
+						$url=$server->EndPoint.$rest[$j]['path'];
+						$rTemp[]='<span class="bold">'.$method.'</span> REST URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span>';
+						if(!is_null($rest[$j]['docs']))
+							$rTemp[]='('.nl2br(htmlentities($rest[$j]['docs'])).')';
+					}
+					$res[]='<p>'.implode("<br>\n",$rTemp).'</p>';
+				}
+			}
+		$url=$server->EndPoint.'/'.$m->Name.'/';
+		$pLen=sizeof($m->Param);
+		if($pLen>0){
+			$i=-1;
+			while(++$i<$pLen)
+				$url.=':'.$m->Param[$i]->Name.'/';
+		}
+		$res[]='<p>Default <span class="bold">GET</span> REST URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
 		return true;
 	}
 	
@@ -332,13 +818,255 @@ class PhpWsdlServers{
 	 * @return boolean Response
 	 */
 	public static function PdfAttachmentHook($data){
-		if(!self::$EnableJson)
-			return true;
 		$temp=&$data['param'];
 		$cnt=&$data['cnt'];
-		$cnt++;
 		$server=$data['server'];
-		$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.php:'.$server->EndPoint.'?PHPJSONCLIENT';
+		if(self::$EnableJson){
+			$cnt++;
+			$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.php:'.self::$UseServer->GetJsonPhpUri();
+			if(self::$AttachJsInPdf){
+				$cnt++;
+				$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.js:'.self::$UseServer->GetJsonJsUri();
+				if(self::$UseServer->IsJsPackerAvailable()){
+					$cnt++;
+					$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.min.js:'.self::$UseServer->GetJsonJsUri().'&min';
+				}
+			}
+		}
+		if(self::$EnableRpc){
+			$cnt++;
+			$temp['attachment_'.$cnt]=$server->Name.'.xmlrpcclient.php:'.self::$UseServer->GetRpcPhpUri();
+		}
+		if(self::$EnableHttp){
+			$cnt++;
+			$temp['attachment_'.$cnt]=$server->Name.'.httpclient.php:'.self::$UseServer->GetHttpPhpUri();
+		}
+		if(self::$EnableRest){
+			$cnt++;
+			$temp['attachment_'.$cnt]=$server->Name.'.restclient.php:'.self::$UseServer->GetRestPhpUri();
+		}
+		return true;
+	}
+	
+	/**
+	 * Constructor hook
+	 * 
+	 * @param array $data The event data
+	 * @return boolean Response
+	 */
+	public static function ConstructorHook($data){
+		new PhpWsdlServers($data['server']);
+		return true;
+	}
+	
+	/**
+	 * Get the HTTP PHP download URI
+	 * 
+	 * @return string The URI
+	 */
+	public function GetHttpPhpUri(){
+		return ((is_null($this->HttpPhpUri))?$this->Server->EndPoint:$this->HttpPhpUri).'?PHPHTTPCLIENT';
+	}
+
+	/**
+	 * Get the JSON PHP download URI
+	 * 
+	 * @return string The URI
+	 */
+	public function GetJsonPhpUri(){
+		return ((is_null($this->JsonPhpUri))?$this->Server->EndPoint:$this->JsonPhpUri).'?PHPJSONCLIENT';
+	}
+	
+	/**
+	 * Get the REST PHP download URI
+	 * 
+	 * @return string The URI
+	 */
+	public function GetRestPhpUri(){
+		return ((is_null($this->RestPhpUri))?$this->Server->EndPoint:$this->RestPhpUri).'?PHPRESTCLIENT';
+	}
+	
+	/**
+	 * Get the XML RPC PHP download URI
+	 * 
+	 * @return string The URI
+	 */
+	public function GetRpcPhpUri(){
+		return ((is_null($this->RpcPhpUri))?$this->Server->EndPoint:$this->RpcPhpUri).'?PHPRPCCLIENT';
+	}
+	
+	/**
+	 * Get the JSON JavaScript download URI
+	 * 
+	 * @return string The URI
+	 */
+	public function GetJsonJsUri(){
+		return ((is_null($this->JsonJsUri))?$this->Server->EndPoint:$this->JsonJsUri).'?JSJSONCLIENT';
+	}
+	
+	/**
+	 * Output the JavaScript JSON client source for this webservice
+	 * 
+	 * @param boolean $withHeaders Send JavaScript headers? (default: TRUE)
+	 * @param boolean $echo Print source (default: TRUE)
+	 * @param boolean $cache Cache the result (default: TRUE);
+	 * @return string JavaScript source
+	 */
+	public function OutputJs($withHeaders=true,$echo=true,$cache=true){
+		PhpWsdl::Debug('Output JavaScript');
+		if(sizeof($this->Server->Methods)<1)
+			$this->Server->CreateWsdl();
+		if($withHeaders)
+			$this->JavaScriptHeaders();
+		if(is_null($this->JsonJs)){
+			$res=Array();
+			$data=Array(
+				'server'		=>	$this,
+				'res'			=>	&$data,
+				'withheaders'	=>	&$withHeaders,
+				'echo'			=>	&$echo,
+				'cache'			=>	&$cache
+			);
+			if(PhpWsdl::CallHook('ServersBeginOutputJsHook',$data)){
+				$res[]='var '.$this->Server->Name.'JsonClient=function(){';
+				$res[]='	this._EndPoint="'.$this->Server->EndPoint.'";';
+				$res[]='	this._Call=function(method,param,cb){';
+				$res[]='		var server=(window.XMLHttpRequest)?new XMLHttpRequest():new ActiveXObject("Microsoft.XMLHTTP");';
+				$res[]='		server.open("POST",this._EndPoint,cb!=null);';
+				$res[]='		server.setRequestHeader("Content-Type","application/x-www-form-urlencoded");';
+				$res[]='		var req="JSON="+encodeURIComponent(JSON.stringify({call:method,param:(param)?param:[]}));';
+				$res[]='		if(cb){';
+				$res[]='			server.onreadystatechange=this._EndCall;';
+				$res[]='			server.cb=cb;';
+				$res[]='			server.send(req);';
+				$res[]='			return server;';
+				$res[]='		}else{';
+				$res[]='			server.send(req);';
+				$res[]='			var res=JSON.parse(server.responseText);';
+				$res[]='			delete(server);';
+				$res[]='			return res;';
+				$res[]='		}';
+				$res[]='	};';
+				$res[]='	this._EndCall=function(e){';
+				$res[]='		var server=e.currentTarget;';
+				$res[]='		if(server.readyState!=4)';
+				$res[]='			return;';
+				$res[]='		if(server.status!=200)';
+				$res[]='			throw(new Exception("AJAX error "+server.status+": "+server.statusText));';
+				$res[]='		server.cb(JSON.parse(server.responseText));';
+				$res[]='		server.cb=null;';
+				$res[]='		delete(server);';
+				$res[]='	};';
+			}
+			$i=-1;
+			$len=sizeof($this->Server->Methods);
+			while(++$i<$len){
+				$m=$this->Server->Methods[$i];
+				if(PhpWsdl::CallHook(
+						'ServersOutputMethodJsHook',
+						array_merge(
+							$data,
+							Array(
+								'method'		=>	&$m
+							)
+						)
+					)
+				){
+					$res[]='	this.'.$m->Name.'=function(';
+					$j=-1;
+					$pLen=sizeof($m->Param);
+					while(++$j<$pLen)
+						$res[]='		'.$m->Param[$j]->Name.',';
+					$res[]='		_cb';
+					$res[]='	){';
+					$res[]='		return this._Call(';
+					$res[]='			"'.$m->Name.'",';
+					$res[]='			[';
+					$j=-1;
+					while(++$j<$pLen)
+						$res[]='			'.$m->Param[$j]->Name.(($j<$eLen-1)?',':'');
+					$res[]='			],';
+					$res[]='			(_cb)?_cb:null';
+					$res[]='		);';
+					$res[]='	};';
+				}
+			}
+			$i=-1;
+			$len=sizeof($this->Server->Types);
+			while(++$i<$len){
+				$t=$this->Server->Types[$i];
+				if(PhpWsdl::CallHook(
+						'ServersOutputTypeJsHook',
+						array_merge(
+							$data,
+							Array(
+								'type'			=>	&$t
+							)
+						)
+					)
+				){
+					$eLen=sizeof($t->Elements);
+					if($eLen<1)
+						continue;
+					$res[]='	this.'.$t->Name.'=function(){';
+					$j=-1;
+					while(++$j<$eLen)
+						$res[]='		this.'.$t->Elements[$j]->Name.'=null;';
+					$res[]='	};';
+				}
+			}
+			if(PhpWsdl::CallHook('ServersEndOutputJsHook',$data)){
+				$res[]='};';
+			}
+			$res=utf8_encode(implode("\n",$res));
+			$this->JsonJs=$res;
+		}
+		$min=$this->ForceJsonJsMin||(self::HasParam('min')&&self::IsJsPackerAvailable()&&!$this->ForceNotJsonJsMin);
+		if($min){
+			if(is_null($this->JsonJsMin))
+				$this->JsonJsMin=$this->PackJavaScript($this->JsonJs);
+			$res=$this->JsonJsMin;
+		}else if(!$min){
+			$res=$this->JsonJs;
+		}
+		if($cache)
+			$this->Server->WriteWsdlToCache(null,null,null,true);
+		if($echo)
+			echo $res;
+		return $res;
+	}
+	
+	/**
+	 * Get data from cache
+	 * 
+	 * @param array $data The event data
+	 * @return boolean Response
+	 */
+	public function ReadCacheHook($data){
+		$d=&$data['data'];
+		$this->HttpPhp=$d['phphttp'];
+		$this->JsonPhp=$d['phpjson'];
+		$this->JsonJs=$d['jsjson'];
+		$this->JsonJsMin=$d['jsjsonmin'];
+		$this->RestPhp=$d['phprest'];
+		$this->RpcPhp=$d['phprpc'];
+		return true;
+	}
+	
+	/**
+	 * Write data to the cache
+	 * 
+	 * @param array $data The event data
+	 * @return boolean Response
+	 */
+	public function WriteCacheHook($data){
+		$d=&$data['data'];
+		$d['phphttp']=$this->HttpPhp;
+		$d['phpjson']=$this->JsonPhp;
+		$d['jsjson']=$this->JsonJs;
+		$d['jsjsonmin']=$this->JsonJsMin;
+		$d['phprest']=$this->RestPhp;
+		$d['phprpc']=$this->RpcPhp;
 		return true;
 	}
 	
@@ -388,19 +1116,21 @@ class PhpWsdlServers{
 				// Unknown parameter handling
 				PhpWsdl::Debug('Undefined parameter handling');
 				$temp=explode('/',$path);
-				$tLen=sizeof($temp)-1;
+				$tLen=sizeof($temp)-2;
 				// Collect parameters from the path info
 				$i=-1;
 				while(++$i<$pLen){
-					$p=$methods->Param[$i];
-					if($i>$tLen){
-						PhpWsdl::Debug('Collecting parameters stopped at missing "'.$p->Name.'"');
+					$p=$method->Param[$i];
+					if($i>$tLen)
 						break;
-					}
-					$req['param'][]=urldecode((in_array($p->Type,PhpWsdl::$BasicTypes))?$temp[$i+1]:json_decode($temp[$i+1]));
+					PhpWsdl::Debug('Found parameter "'.$p->Name.'"');
+					PhpWsdl::Debug('I '.$i);
+					PhpWsdl::Debug('tLen '.$tLen);
+					PhpWsdl::Debug(urldecode($temp[$i+2]));
+					$req['param'][]=(in_array($p->Type,PhpWsdl::$BasicTypes))?urldecode($temp[$i+2]):json_decode(urldecode($temp[$i+2]));
 				}
 			}else{
-				// Declared parameter handling
+				// Fixed parameter handling
 				PhpWsdl::Debug('Fixed parameter handling');
 				if(strpos($target,':')>-1){
 					PhpWsdl::Debug('Method with parameters');
@@ -447,7 +1177,8 @@ class PhpWsdlServers{
 				}
 			}
 			// Collect the last parameter from the request body
-			if($i<$pLen&&$pLen>0){
+			$in=file_get_contents('php://input');
+			if($in!=''&&$i<$pLen&&$pLen>0){
 				if(PhpWsdl::CallHook(
 						'RestRequestHook',
 						Array(
@@ -456,15 +1187,13 @@ class PhpWsdlServers{
 			    			'path'			=>	&$path,
 			    			'method'		=>	&$method,
 			    			'target'		=>	&$target,
+							'in'			=>	&$in,
 							'index'			=>	$i
 						)
 					)
 				){
-					$temp=file_get_contents('php://input');
-					if($temp!=''){
-						PhpWsdl::Debug('Use request body as parameter #'.($i+1));
-						$req['param'][]=json_decode($temp);
-					}
+					PhpWsdl::Debug('Use request body as parameter #'.($i+1));
+					$req['param'][]=json_decode($temp);
 				}
 			}
 		}
@@ -588,6 +1317,85 @@ class PhpWsdlServers{
 	}
 	
 	/**
+	 * Handle a RPC request
+	 * 
+	 * @return boolean Response
+	 */
+	public function HandleRpcRequest(){
+		if(!self::IsRpcRequest())
+			return true;
+		PhpWsdl::Debug('Run XML RPC server');
+		$rpc=xmlrpc_server_create();
+		$i=-1;
+		$len=sizeof($this->Server->Methods);
+		while(++$i<$len)
+			xmlrpc_server_register_method($rpc,$this->Server->Methods[$i]->Name,Array($this,'RpcCallHandler'));
+		$temp=xmlrpc_server_call_method($rpc,file_get_contents('php://input'),null);
+		$this->XmlHeaders();
+		ob_start('ob_gzhandler');
+		echo $temp;
+		return false;
+	}
+	
+	/**
+	 * (Internal) handle a RPC call
+	 * 
+	 * @param string $method The method name
+	 * @param array $param The parameters
+	 * @return mixed The response
+	 */
+	public function RpcCallHandler($method,$param){
+    	PhpWsdl::Debug('XML RPC call "'.$method.'"');
+		$m=$this->Server->GetMethod($method);
+		if(is_null($m))
+			throw(new Exception('Method "'.$method.'" not exists'));
+		if(!self::$EnableRpcNamedParameters){
+			// Unnamed parameters
+			PhpWsdl::Debug('Unnamed parameters');
+			$req=Array(
+				'call'			=>	$m->Name,
+				'param'			=>	$param
+			);
+		}else{
+			// Named parameters
+			PhpWsdl::Debug('Named parameters');
+			$req=Array(
+				'call'			=>	$m->Name,
+				'param'			=>	Array()
+			);
+			$map=Array();
+			$i=-1;
+			$pLen=sizeof($param);
+			while(++$i<$pLen){
+				$p=$param[$i];
+				$keys=array_keys($p);
+				PhpWsdl::Debug('Found parameter "'.$keys[0].'"');
+				$map[$keys[0]]=$p[$keys[0]];
+			}
+			$lastValue=-1;
+			$i=-1;
+			$pLen=sizeof($m->Param);
+			while(++$i<$pLen){
+				$p=$m->Param[$i];
+				if(isset($map[$p->Name])){
+					$req['param'][]=$map[$p->Name];
+					$lastValue=$i;
+				}else{
+					PhpWsdl::Debug('Missing parameter "'.$p->Name.'"');
+					$req['param'][]=null;
+				}
+			}
+			if($lastValue<$pLen-1){
+				PhpWsdl::Debug('Slice parameters array from index #'.$lastValue);
+				$req['param']=array_slice($req['param'],0,$lastValue+1);
+			}
+		}
+    	if(PhpWsdl::$Debugging)
+    		PhpWsdl::Debug('Parameters: '.print_r($req['param'],true));
+		return $this->HandleRequest($req,$m);
+	}
+	
+	/**
 	 * Handle a request
 	 * 
 	 * @param array $req The request data
@@ -627,6 +1435,25 @@ class PhpWsdlServers{
 	 */
 	private function PlainTextHeaders(){
 		header('Content-Type: text/plain; encoding=UTF-8');
+		if(self::$DisableClientCache)
+			$this->NoCacheHeaders();
+	}
+
+	/**
+	 * Output XML response headers
+	 */
+	private function XmlHeaders(){
+		header('Content-Type: text/xml; encoding=UTF-8');
+		if(self::$DisableClientCache)
+			$this->NoCacheHeaders();
+	}
+
+	/**
+	 * Output JavaScript response headers
+	 */
+	private function JavaScriptHeaders(){
+		header('Content-Type: text/javascript; encoding=UTF-8');
+		header('Content-Disposition: attachment; filename='.$this->Server->Name.'JsonClient.js');
 		if(self::$DisableClientCache)
 			$this->NoCacheHeaders();
 	}
@@ -694,12 +1521,13 @@ class PhpWsdlServers{
 			$rLen=sizeof($rest);
 			while(++$j<$rLen){
 				$call=$rest[$j]['path'];
+				$param=null;
 				if(strpos($call,':')>-1)
-					list($call,$dummy)=explode(':',$call,2);
+					list($call,$param)=explode(':',$call,2);
 				if(substr($call,strlen($call)-1)!='/')
 					$call.='/';
-				if(substr($path,0,strlen($call))==$call){
-					PhpWsdl::Debug('Method found at index #'.$i);
+				if((!is_null($param)&&substr($path,0,strlen($call))==$call)||$path==$call){
+					PhpWsdl::Debug('Method found at index #'.$i.' with target "'.$rest[$j]['path'].'"');
 					return Array($m,$rest[$j]['path']);
 				}
 			}
@@ -710,5 +1538,36 @@ class PhpWsdlServers{
 		return (is_null($res))
 			?null
 			:Array($res,null);
+	}
+	
+	/**
+	 * Compress a JavaScript
+	 * 
+	 * @param string $js The uncompressed JavaScript
+	 * @return string The compressed JavaScript
+	 */
+	private function PackJavaScript($js){
+		if(!self::IsJsPackerAvailable())
+			return $js;
+		PhpWsdl::Debug('Compress a JavaScript');
+		if(PhpWsdl::HasHookHandler('ServersPackJsHook'))
+			return PhpWsdl::CallHook(
+				'ServersPackJsHook',
+				Array(
+					'server'		=>	$this,
+					'js'			=>	&$js
+				)
+			);
+		$packer=new PhpWsdlJavaScriptPacker(utf8_decode($js),62,true,true);
+		return utf8_encode($packer->pack());
+	}
+	
+	/**
+	 * Determine if the JavaScript packer is available
+	 * 
+	 * @return boolean Available?
+	 */
+	public static function IsJsPackerAvailable(){
+		return PhpWsdl::HasHookHandler('ServersPackJsHook')||class_exists('PhpWsdlJavaScriptPacker');
 	}
 }

@@ -20,7 +20,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
-require_once(dirname(__FILE__).'/class.phpwsdlclient.php');
+PhpWsdlAjax::Init();
 
 /**
  * This webservice forwards a SOAP request to another SOAP server using the PhpWsdlClient
@@ -34,6 +34,12 @@ class PhpWsdlAjax{
 	 * @var PhpWsdlClient
 	 */
 	public static $Client=null;
+	/**
+	 * The default CURL options for PhpWsdlAjax::HttpRequest
+	 * 
+	 * @var array
+	 */
+	public static $CurlOptions=null;
 	
 	/**
 	 * This will run the proxy webservice and exit the script execution
@@ -41,7 +47,8 @@ class PhpWsdlAjax{
 	 * @param strign $wsdl The WSDL URI
 	 */
 	public static function RunProxy($wsdl){
-		PhpWsdl::Debug('Run PhpWsdlAjax proxy');
+		require_once(dirname(__FILE__).'/class.phpwsdlclient.php');
+		PhpWsdl::Debug('Run PhpWsdlAjax proxy at '.$wsdl);
 		PhpWsdl::RegisterHook('CreatePhpCallHook','ajax','PhpWsdlAjax::CreatePhpCall');
 		self::$Client=new PhpWsdlClient($wsdl);
 		$server=self::$Client->CreateServerFromWsdl();
@@ -51,6 +58,54 @@ class PhpWsdlAjax{
 				'openphp'		=>	false
 			)));
 		$server->RunServer(null,'PhpWsdlAjaxProxy');
+	}
+	
+	/**
+	 * This will forward a request to another URI, output the response and exit
+	 * 
+	 * @param string $targetUri The target URI
+	 */
+	public static function RunForwarder($targetUri){
+		require_once(dirname(__FILE__).'/class.phpwsdl.php');
+		PhpWsdl::Debug('Run PhpWsdlAjax forwarder at '.$targetUri);
+		if($_SERVER['REQUEST_METHOD']=='GET'){
+			PhpWsdl::Debug('Forward GET request');
+			ob_start('ob_gzhandler');
+			echo self::HttpRequest((isset($_SERVER['QUERY_STRING']))?'?'.$_SERVER['QUERY_STRING']:'',null,$targetUri);
+		}else{
+			PhpWsdl::Debug('Forward POST request');
+			ob_start('ob_gzhandler');
+			echo self::HttpRequest(null,file_get_contents('php://input'),$targetUri);
+		}
+		exit;
+	}
+	
+	/**
+	 * Do a http request
+	 * 
+	 * @param string $get The GET query string or NULL
+	 * @param string $post The POST query string or NULL
+	 * @param string $targetUri The target URI
+	 * @return string The response
+	 */
+	public static function HttpRequest($get,$post,$targetUri){
+		if(is_null($post))
+			return file_get_contents($targetUri.(($get!='')?'?'.$get:''));
+		$ch=curl_init($targetUri);
+		curl_setopt_array($ch,array_merge(
+			self::$CurlOptions,
+			Array(
+				CURLOPT_POSTFIELDS	=>	$post
+			)
+		));
+		$res=curl_exec($ch);
+		if(curl_errno($ch)){
+			$err=curl_error($ch);
+			curl_close($ch);
+			throw(new Exception($err));
+		}
+		curl_close($ch);
+		return $res;
 	}
 	
 	/**
@@ -65,5 +120,18 @@ class PhpWsdlAjax{
 		$res[]="\t\t\tself::\$_Server=PhpWsdlAjax::\$Client->GetClient();";
 		$res[]="\t\treturn PhpWsdlAjax::\$Client->DoRequest(\$method,\$param);";
 		return false;
+	}
+	
+	/**
+	 * Init PhpWsdlAjax
+	 */
+	public static function Init(){
+		self::$CurlOptions=Array(
+			CURLOPT_POST			=>	true,
+			CURLOPT_SSL_VERIFYPEER	=>	false,
+			CURLOPT_SSL_VERIFYHOST	=>	false,
+			CURLOPT_HEADER			=>	false,
+			CURLOPT_RETURNTRANSFER	=>	true
+		);
 	}
 }

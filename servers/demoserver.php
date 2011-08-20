@@ -5,21 +5,34 @@
 
 // Load PhpWsdl
 require_once('class.phpwsdl.php');
-PhpWsdl::$HTML2PDFLicenseKey='4f5f1f6537afea2a10f5c4889b8397959e69e634';
 
 // Load the servers extension, if PhpWsdl could not do it 
 // (because the "glob" function may be disabled in your PHP installation)
-// If "glob" is working, you don't need the following two lines:
+// If "glob" is working, you don't need those lines:
 if(!class_exists('PhpWsdlServers')) 
 	require_once('class.phpwsdl.servers.php');
+if(!class_exists('PhpWsdlJavaScriptPacker')) 
+	require_once('class.phpwsdl.servers-jspacker.php');
+
+// This Would disable some servers
+//PhpWsdlServers::$EnableHttp=false;// Disable the http webservice
+//PhpWsdlServers::$EnableJson=false;// Disable the JSON webservice
+//PhpWsdlServers::$EnableRest=false;// Disable the REST webservice
+//PhpWsdlServers::$EnableRpc=false;// Disable the XML RPC webservice
 
 // This would enable the client cache
 //PhpWsdlServers::$DisableClientCache=false;
 
+// This would enable named parameters for a XML RPC client
+//PhpWsdlServers::$EnableRpcNamedParameters=true;
+
+// This would enable attaching the JavaScript clients to the PDF documentation
+//PhpWsdlServers::$AttachJsInPdf=true;
+
 // Run the PhpWsdl server in quick mode
 /*PhpWsdl::$Debugging=true;
 PhpWsdl::$DebugFile=PhpWsdl::$CacheFolder.'/debug.log';*/
-$soap=PhpWsdl::RunQuickMode(
+PhpWsdl::RunQuickMode(
 	Array(								// All files with WSDL definitions in comments
 		'class.soapdemo.php',
 		'class.complextypedemo.php'
@@ -27,5 +40,5 @@ $soap=PhpWsdl::RunQuickMode(
 );
 
 // This extension will determine which type of server should run. Currently 
-// supported are: JSON, http and REST. See the democlient-*.php for examples 
-// how to do the different request types.
+// supported are: JSON, http, XML RPC and REST. See the democlient-*.php for 
+// examples how to do the different request types.

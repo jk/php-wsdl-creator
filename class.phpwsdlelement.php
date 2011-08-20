@@ -114,6 +114,10 @@ class PhpWsdlElement extends PhpWsdlParam{
 		if(!is_null($e->Docs))
 			$res[$o].='<br><span class="normal">'.nl2br(htmlentities($e->Docs)).'</span>';
 		$res[$o].='</li>';
+		PhpWsdl::CallHook(
+			'CreateElementHtmlHook',
+			$data
+		);
 	}
 	
 	/**

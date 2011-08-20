@@ -561,11 +561,9 @@ class PhpWsdlClient{
 			$this->NameSpace=$data['namespace'];
 			PhpWsdl::CallHook(
 				'ClientReadCacheHook',
-				array_merge(
-					$data,
-					Array(
-						'client'		=>	$this
-					)
+				Array(
+					'client'		=>	$this,
+					'data'			=>	&$data
 				)
 			);
 			if($data['version']!=self::$VERSION){
@@ -639,11 +637,9 @@ class PhpWsdlClient{
 		);
 		PhpWsdl::CallHook(
 			'ClientWriteCacheHook',
-			array_merge(
-				$data,
-				Array(
-					'client'		=>	$this
-				)
+			Array(
+				'client'		=>	$this,
+				'data'			=>	&$data
 			)
 		);
 		if(file_put_contents($file.'.obj',serialize($data))===false){

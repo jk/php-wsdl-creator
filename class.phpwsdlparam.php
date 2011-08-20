@@ -99,6 +99,10 @@ class PhpWsdlParam extends PhpWsdlObject{
 			$res[]='<li class="pre"><a href="#'.$p->Type.'"><span class="lightBlue">'.$p->Type.'</span></a> <span class="bold">'.$p->Name.'</span>';
 		}
 		$res[sizeof($res)-1].='<br><span class="normal">'.nl2br(htmlentities($p->Docs)).'</span></li>';
+		PhpWsdl::CallHook(
+			'CreateParameterHtmlHook',
+			$data
+		);
 	}
 	
 	/**
@@ -119,6 +123,10 @@ class PhpWsdlParam extends PhpWsdlObject{
 			$res[$o].='<a href="#'.$type.'"><span class="lightBlue">'.$type.'</span></a>';
 		}
 		$res[$o].='</span>'.((!is_null($m->Return->Docs))?': '.nl2br(htmlentities($m->Return->Docs)):'').'</p>';
+		PhpWsdl::CallHook(
+			'CreateReturnHtmlHook',
+			$data
+		);
 	}
 	
 	/**

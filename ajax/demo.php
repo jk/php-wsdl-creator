@@ -11,4 +11,5 @@ require_once('class.phpwsdlajax.php');// This PHP script will load the PhpWsdl f
 PhpWsdlAjax::RunProxy('http://www.webservicex.net/geoipservice.asmx?WSDL');// The parameter is the WSDL URI of the target SOAP webservice
 
 // Note: The proxy can only handle simple SOAP webservices that only use the basic method and 
-// complex types PhpWsdl supports!
+// complex types PhpWsdl supports! If your target webservice can't be run with this proxy, have 
+// a look at demo2.php for another solution.

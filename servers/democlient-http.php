@@ -13,23 +13,40 @@
 // This is the URI to the http server
 $endPoint=((isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on')?'https':'http').'://'.$_SERVER['SERVER_NAME'].dirname($_SERVER['SCRIPT_NAME']).'/demoserver.php';
 
+echo '<pre>';
+
 // This will call the method "SayHello"
 $param=Array();
 $param['call']='SayHello';	// The method name
 $param['name']='you';		// The parameter "name"
+$res=file_get_contents($endPoint.'?'.encodeParam($param));
+echo "SayHello:\n".htmlentities($res)."\n";
 
-// Encode the parameters for a http request
-$temp=Array();
-$i=-1;
-$keys=array_keys($param);
-$len=sizeof($keys);
-while(++$i<$len)
-	$temp[]=urlencode($keys[$i]).'='.urlencode($param[$keys[$i]]);
-$param=implode('&',$temp);
+// This will call the method "GetComplexType"
+$param=Array();
+$param['call']='GetComplexType';
+$res=file_get_contents($endPoint.'?'.encodeParam($param));
+$res=json_decode($res);
+echo "\nGetComplexType:\n".htmlentities(print_r($res,true))."\n";
 
-// Call the webservice
-$res=file_get_contents($endPoint.'?'.$param);
+// This will call the method "PrintComplexType"
+$param=Array();
+$param['call']='PrintComplexType';
+$param['obj']=json_encode($res);
+$res=file_get_contents($endPoint.'?'.encodeParam($param));
+echo "\nPrintComplexType:\n".htmlentities($res)."\n";
 
-// Display the result and quit
-echo htmlentities($res);
+echo '</pre>';
 exit;
+
+// Encode parameters for the http request
+function encodeParam($param){
+	$temp=Array();
+	$keys=array_keys($param);
+	$i=-1;
+	$len=sizeof($keys);
+	while(++$i<$len)
+		$temp[]=urlencode($keys[$i]).'='.urlencode($param[$keys[$i]]);
+	$param=implode('&',$temp);
+	return $param;
+}
