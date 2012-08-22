@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -23,7 +23,7 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 /**
  * PhpWsdl element object base
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlObject{
 	/**

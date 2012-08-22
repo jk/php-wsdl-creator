@@ -23,7 +23,8 @@ require_once('class.complextypedemo.php');
 
 // Initialize the PhpWsdl class
 require_once('class.phpwsdl.php');
-PhpWsdl::$UseProxyWsdl=true;			// Comment this line out to get rid of "Missing parameter" exceptions
+PhpWsdlMethod::$DefaultException='SoapFault';// This will set SoapFault as exception type for all methods
+PhpWsdl::$UseProxyWsdl=true;			// Comment this line out to get rid of "Missing parameter" exceptions and to use the method "AnotherDemoMethod" exported by the class "SecondClass"
 $soap=PhpWsdl::CreateInstance(
 	null,								// PhpWsdl will determine a good namespace
 	null,								// Change this to your SOAP endpoint URI (or keep it NULL and PhpWsdl will determine it)
@@ -67,3 +68,18 @@ function GlobalMethodDemo(){
 // If you want PhpWsdl to handle all methods as global per default, set the 
 // PhpWsdlMethod::$IsGlobalDefault to TRUE. Then you don't need to set the 
 // setting "global" to "1" for every method. 
+
+class SecondClass{
+	/**
+	 * This method is in another class
+	 * 
+	 * @param string $str A string
+	 * @return string The input string
+	 */
+	public function AnotherDemoMethod($str){
+		return $str;
+	}
+}
+
+// If you want to export handler methods from different classes, ensure that 
+// the PHP SoapServer won't get the WSDL

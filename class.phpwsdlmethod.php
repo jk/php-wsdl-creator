@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -22,13 +22,12 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 
 PhpWsdl::RegisterHook('InterpretKeywordpw_omitfncHook','internal','PhpWsdlMethod::InterpretOmit');
 PhpWsdl::RegisterHook('InterpretKeywordignoreHook','internal','PhpWsdlMethod::InterpretOmit');
-PhpWsdl::RegisterHook('InterpretKeywordpw_setHook','internal','PhpWsdlMethod::InterpretSetting');
 PhpWsdl::RegisterHook('CreateObjectHook','internalmethod','PhpWsdlMethod::CreateMethodObject');
 
 /**
  * A method definition object
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlMethod extends PhpWsdlObject{
 	/**
@@ -50,11 +49,30 @@ class PhpWsdlMethod extends PhpWsdlObject{
 	 */
 	public $IsGlobal=false;
 	/**
+	 * The class name or the object that contains this method
+	 * 
+	 * @var string|object
+	 */
+	public $Class=null;
+	/**
+	 * The exception type name for this method
+	 * Tip: Set this to an empty string to override the default exception type name
+	 * 
+	 * @var string
+	 */
+	public $Exception=null;
+	/**
 	 * A new method is global per default?
 	 * 
 	 * @var boolean
 	 */
 	public static $IsGlobalDefault=false;
+	/**
+	 * The name of the default exception type
+	 * 
+	 * @var string
+	 */
+	public static $DefaultException=null;
 	
 	/**
 	 * Constructor
@@ -71,9 +89,26 @@ class PhpWsdlMethod extends PhpWsdlObject{
 			$this->Param=$param;
 		$this->Return=$return;
 		$this->IsGlobal=self::$IsGlobalDefault;
-		if(!is_null($settings))
+		$this->Exception=self::$DefaultException;
+		if(!is_null($settings)){
 			if(isset($settings['global']))
 				$this->IsGlobal=$settings['global']=='true'||$settings['global']=='1';
+			if(isset($settings['class']))
+				$this->Class=$settings['class'];
+			if(isset($settings['exception']))
+				$this->Exception=$settings['exception'];
+		}
+	}
+	
+	/**
+	 * Get the exception type name
+	 * 
+	 * @return string The type name or NULL
+	 */
+	public function GetExceptionTypeName(){
+		return (!is_null($this->Exception))
+			?$this->Exception
+			:self::$DefaultException;
 	}
 	
 	/**
@@ -100,6 +135,9 @@ class PhpWsdlMethod extends PhpWsdlObject{
 			$res[]='<wsdl:documentation><![CDATA['.$this->Docs.']]></wsdl:documentation>';
 		$res[]='<wsdl:input message="tns:'.$this->Name.'SoapIn" />';
 		$res[]='<wsdl:output message="tns:'.$this->Name.'SoapOut" />';
+		$ex=$this->GetExceptionTypeName();
+		if($ex!=null)
+			$res[]='<wsdl:fault message="tns:'.$this->Name.'Exception" />';
 		$res[]='</wsdl:operation>';
 		return implode('',$res);
 	}
@@ -133,6 +171,12 @@ class PhpWsdlMethod extends PhpWsdlObject{
 			$res[sizeof($res)-1].=' parts="'.$this->Return->Name.'"';
 		$res[sizeof($res)-1].=' />';
 		$res[]='</wsdl:output>';
+		$ex=$this->GetExceptionTypeName();
+		if($ex!=null){
+			$res[]='<wsdl:fault>';
+			$res[]='<soap:fault name="'.$this->Name.'Exception" use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="'.$pw->NameSpace.'" />';
+			$res[]='</wsdl:fault>';
+		}
 		$res[]='</wsdl:operation>';
 		return implode('',$res);
 	}
@@ -163,6 +207,13 @@ class PhpWsdlMethod extends PhpWsdlObject{
 		}else{
 			$res[]='<wsdl:message name="'.$this->Name.'SoapOut">';
 			$res[]=$this->Return->CreatePart($pw);
+			$res[]='</wsdl:message>';
+		}
+		// Exception
+		$ex=$this->GetExceptionTypeName();
+		if($ex!=null){
+			$res[]='<wsdl:message name="'.$this->Name.'Exception">';
+			$res[]='<wsdl:part name="fault" type="tns:'.$ex.'" />';
 			$res[]='</wsdl:message>';
 		}
 		return implode('',$res);
@@ -305,26 +356,6 @@ class PhpWsdlMethod extends PhpWsdlObject{
 			$res[]="\t\t));";
 		}
 		$res[]="\t}";
-	}
-	
-	/**
-	 * Interpret a setting
-	 * 
-	 * @param array $data The parser data
-	 * @return boolean Response
-	 */
-	public static function InterpretSetting($data){
-		$info=explode(' ',$data['keyword'][1],2);
-		if(sizeof($info)<1)
-			return true;
-		PhpWsdl::Debug('Interpret setting '.$info[0]);
-		$info=explode('=',$info[0],2);
-		if(sizeof($info)>1){
-			$data['settings'][$info[0]]=$info[1];
-		}else if(isset($data['settings'][$info[0]])){
-			unset($data['settings'][$info[0]]);
-		}
-		return false;
 	}
 	
 	/**

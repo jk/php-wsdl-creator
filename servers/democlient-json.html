@@ -18,13 +18,14 @@ function runDemo(){
 		var client=new SoapDemoJsonClient();
 		// Call the method "SayHello"
 		alert(client.SayHello('you'));
-		// Create an object with the "GetComplexType" method and change a property
+		// Create an object with the "GetComplexType" method and change some properties
 		var res=client.GetComplexType();
 		res.StringB='test';
+		res.Enum=client.DemoEnum.ValueC;
 		// Print the object with the "PrintComplexType" method
 		alert(client.PrintComplexType(res));
 		// Call the method "SayHello" in asynchron AJAX mode
-		client.SayHello('you',SayHelloCallback);
+		client.SayHello('you',SayHelloCallback,'Some data for the callback method');
 	}catch(ex){
 		// This should never happen...
 		alert('Error: '+ex.message);
@@ -32,8 +33,8 @@ function runDemo(){
 }
 
 // This is the callback method for the SayHello asynchron call
-function SayHelloCallback(res){
-	alert(res);
+function SayHelloCallback(res,data){
+	alert(res+((typeof(data)=='undefined')?'':"\n"+data));
 }
 </script>
 

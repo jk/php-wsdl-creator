@@ -39,4 +39,5 @@ $res=file_get_contents($endPoint.'?json='.urlencode(json_encode($req)));
 $res=json_decode($res);
 echo "\nPrintComplexType:\n".htmlentities($res)."\n";
 
+echo '</pre>';
 exit;

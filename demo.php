@@ -11,6 +11,7 @@ require_once('class.complextypedemo.php');
 
 // Initialize the PhpWsdl class
 require_once('class.phpwsdl.php');
+PhpWsdlMethod::$DefaultException='SoapFault';// This will set SoapFault as exception type for all methods
 $soap=PhpWsdl::CreateInstance(
 	null,								// PhpWsdl will determine a good namespace
 	null,								// Change this to your SOAP endpoint URI (or keep it NULL and PhpWsdl will determine it)
@@ -33,7 +34,7 @@ PhpWsdl::$CacheTime=0;					// Disable caching in PhpWsdl
 if($soap->IsWsdlRequested())			// WSDL requested by the client?
 	$soap->Optimize=false;				// Don't optimize WSDL to send it human readable to the browser
 //$soap->ParseDocs=false;				// Uncomment this line to disable the whole documentation features
-//$soap->IncludeDocs=false;				// Uncomment this line to disable writing the documentation in WSDL XML
+//$soap->IncludeDocs=false;				// Uncomment this line to disable writing the documentation into the WSDL XML
 //$wsdl=$soap->CreateWsdl();			// This would save the WSDL XML string in $wsdl
 //$php=$soap->OutputPhp(false,false);	// This would save a PHP SOAP client as PHP source code string in $php
 //$html=$soap->OutputHtml(false,false);	// This would save the HTML documentation string in $html

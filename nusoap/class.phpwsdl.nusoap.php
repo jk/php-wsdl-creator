@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -45,7 +45,7 @@ PhpWsdl::RegisterHook('CreateHtmlGeneralHook','nusoap','PhpWsdlNuSOAP::CreateHtm
 /**
  * This class will run a NuSOAP SOAP server with PhpWsdl
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlNuSOAP{
 	/**
@@ -173,7 +173,7 @@ class PhpWsdlNuSOAP{
 			)
 				continue;
 			if($t->IsArray){
-				$type=substr($t->Name,0,strlen($t->Name)-5);
+				$type=$t->Type;
 				self::$Server->wsdl->addComplexType(
 					$t->Name,
 					'complexType',
@@ -188,6 +188,14 @@ class PhpWsdlNuSOAP{
 						)
 					),
 					(in_array($type,PhpWsdl::$BasicTypes))?'xsd:'.$type:'tns:'.$type
+				);
+			}else if(get_class($t)=='PhpWsdlEnum'){
+				self::$Server->wsdl->addSimpleType(
+					$t->Name,
+					(in_array($t->Type,PhpWsdl::$BasicTypes))?'xsd:'.$t->Type:'tns:'.$t->Type,
+					'simpleType',
+					'scalar',
+					$t->Elements
 				);
 			}else{
 				$el=Array();
@@ -287,15 +295,11 @@ class PhpWsdlNuSOAP{
 			$nt=$ntl[$keys[$i]];
 			$name=$nt['name'];
 			PhpWsdl::Debug('Add type '.$name);
-			if($nt['typeClass']!='complexType'){
-				PhpWsdl::Debug('WARNING: Not a complex type');
-				continue;
-			}
 			if(!is_null($phpwsdl->GetType($name))){
 				PhpWsdl::Debug('WARNING: Double type detected!');
 				continue;
 			}
-			if($nt['phpType']=='array'){
+			if($nt['typeClass']=='complexType'&&$nt['phpType']=='array'){
 				// Array
 				PhpWsdl::Debug('Array type');
 				list($temp,$type)=explode(':',$nt['arrayType'],2);
@@ -303,15 +307,13 @@ class PhpWsdlNuSOAP{
 				$t->Type=$type;
 				$t->IsArray=true;
 				$phpwsdl->Types[]=$t;
-			}else{
+			}else if($nt['typeClass']=='complexType'){
 				// Complex type
 				PhpWsdl::Debug('Complex type');
-				if(PhpWsdl::$Debugging){
-					if($nt['phpType']!='struct')
-						PhpWsdl::Debug('WARNING: Not a struct');
-					if($nt['compositor']!='sequence')
-						PhpWsdl::Debug('WARNING: Not sequenced elements');
-				}
+				if($nt['phpType']!='struct')
+					PhpWsdl::Debug('WARNING: Not a PHP struct');
+				if($nt['compositor']!='sequence')
+					PhpWsdl::Debug('WARNING: Not sequenced elements');
 				$el=Array();
 				$ek=array_keys($nt['elements']);
 				$j=-1;
@@ -323,6 +325,13 @@ class PhpWsdlNuSOAP{
 					$el[]=new PhpWsdlElement($n,$type);
 				}
 				$phpwsdl->Types[]=new PhpWsdlComplex($name,$el);
+			}else if($nt['typeClass']=='simpleType'){
+				// Enumeration
+				PhpWsdl::Debug('Enumeration');
+				list($temp,$type)=explode(':',$nt['type']);
+				$phpwsdl->Types[]=new PhpWsdlEnum($name,$type,$nt['enumeration']);
+			}else{
+				PhpWsdl::Debug('WARNING: PHP type "'.$nt['phpType'].'" is not supported!');
 			}
 		}
 		// Methods

@@ -7,6 +7,8 @@
 // prefer to work with a documented PHP client class that handles all the SOAP 
 // for you.
 
+// Note: PhpWsdlClient don't support working with inherited complex types!
+
 if(isset($_GET['name'])){
 	// Perform SOAP request
 	require_once('class.phpwsdlclient.php');// All depencies are loaded here

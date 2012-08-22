@@ -32,3 +32,10 @@ want to send asynchron AJAX requests, simply provide an empty function as
 callback method:
 
 	client.DemoMethod(function(res){});
+
+If you want to submit some data to the callback method, you can append them as 
+an additional parameter:
+
+	client.DemoMethod(function(res,data){alert(data);},'Some callback data');
+
+This will alert "Some callback data" when the DemoMethod responded.

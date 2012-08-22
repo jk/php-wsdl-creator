@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -25,7 +25,7 @@ PhpWsdl::RegisterHook('InterpretKeywordpw_elementHook','internal','PhpWsdlElemen
 /**
  * An element of a complex type
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlElement extends PhpWsdlParam{
 	/**
@@ -33,7 +33,7 @@ class PhpWsdlElement extends PhpWsdlParam{
 	 * 
 	 * @var boolean
 	 */
-	public $NillAble=true;
+	public $NillAble;
 	/**
 	 * Minimum number of elements
 	 * 

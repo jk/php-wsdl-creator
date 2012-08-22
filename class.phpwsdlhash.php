@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -82,7 +82,7 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
  * @pw_complex StringHash String hash array type
  */
 /**
- * @pw_complex StringHashArray Array of string hash array types
+ * @pw_complex arrayOfStringHash[] StringHash Array of string hash array types
  */
 /**
  * Key/Value pair types for int value type
@@ -92,7 +92,7 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
  * @pw_complex IntHash Int hash array type
  */
 /**
- * @pw_complex IntHashArray Array of int hash array types
+ * @pw_complex arrayOfIntHashArray[] IntHashArray Array of int hash array types
  */
 /**
  * Key/Value pair types for boolean value type
@@ -102,13 +102,13 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
  * @pw_complex BooleanHash Boolean hash array type
  */
 /**
- * @pw_complex BooleanHashArray Array of boolean hash array types
+ * @pw_complex arrayOfBooleanHashArray[] BooleanHashArray Array of boolean hash array types
  */
 
 /**
  * This class contains static methods to (de)serialize hash arrays
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlHashArrayBuilder{
 	/**
@@ -150,7 +150,7 @@ class PhpWsdlHashArrayBuilder{
 /**
  * This class simply holds a key/value pair
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlHash{
 	/**

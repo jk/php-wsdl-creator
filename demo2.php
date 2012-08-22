@@ -10,6 +10,7 @@ require_once('class.complextypedemo.php');
 
 // Initialize the PhpWsdl class
 require_once('class.phpwsdl.php');
+PhpWsdlMethod::$DefaultException='SoapFault';// This will set SoapFault as exception type for all methods
 $soap=PhpWsdl::CreateInstance(
 	null,								// PhpWsdl will determine a good namespace
 	null,								// Change this to your SOAP endpoint URI (or keep it NULL and PhpWsdl will determine it)
@@ -22,7 +23,7 @@ $soap=PhpWsdl::CreateInstance(
 			null,
 			new PhpWsdlParam(
 				'GetComplexTypeResult',
-				'ComplexTypeDemo'
+				'ComplexTypeDemoB'
 			)
 		),
 		new PhpWsdlMethod(				// SoapDemo->PrintComplexType method
@@ -30,7 +31,7 @@ $soap=PhpWsdl::CreateInstance(
 			Array(
 				new PhpWsdlParam(
 					'obj',
-					'ComplexTypeDemo'
+					'ComplexTypeDemoB'
 				)
 			),
 			new PhpWsdlParam(
@@ -43,7 +44,7 @@ $soap=PhpWsdl::CreateInstance(
 			Array(
 				new PhpWsdlParam(
 					'arr',
-					'ComplexTypeDemoArray'
+					'ComplexTypeDemoBArray'
 				)
 			),
 			new PhpWsdlParam(
@@ -82,18 +83,24 @@ $soap=PhpWsdl::CreateInstance(
 				),
 				new PhpWsdlElement(
 					'Integer',
-					'int',
-					Array(
-						'nillable'		=>	'false'
-					)
+					'int'
 				),
 				new PhpWsdlElement(
 					'Boolean',
-					'boolean',
-					Array(
-						'nillable'		=>	'false'
-					)
+					'boolean'
 				)
+			)
+		),
+		new PhpWsdlComplex(				// ComplexTypeDemoB class
+			'ComplexTypeDemoB',
+			Array(
+				new PhpWsdlElement(
+					'AdditionalString',
+					'string'
+				)
+			),
+			Array(
+				'inherit'		=>	'ComplexTypeDemo'
 			)
 		),
 		new PhpWsdlComplex(				// string array
@@ -101,6 +108,36 @@ $soap=PhpWsdl::CreateInstance(
 		),
 		new PhpWsdlComplex(				// ComplexTypeDemo array
 			'ComplexTypeDemoArray'
+		),
+		new PhpWsdlEnum(				// string enumeration
+			'DemoEnum',
+			'string',
+			Array(
+				'ValueA',
+				'ValueB',
+				'ValueC'
+			)
+		),
+		new PhpWsdlComplex(				// SoapFault exception type
+			'SoapFault',
+			Array(
+				new PhpWsdlElement(
+					'message',
+					'string'
+				),
+				new PhpWsdlElement(
+					'code',
+					'int'
+				),
+				new PhpWsdlElement(
+					'file',
+					'string'
+				),
+				new PhpWsdlElement(
+					'line',
+					'int'
+				)
+			)
 		)
 	),
 	false,								// Don't send WSDL right now

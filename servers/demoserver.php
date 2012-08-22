@@ -14,6 +14,9 @@ if(!class_exists('PhpWsdlServers'))
 if(!class_exists('PhpWsdlJavaScriptPacker')) 
 	require_once('class.phpwsdl.servers-jspacker.php');
 
+// This disables response compression (some servers don't support that)
+PhpWsdlServers::$EnableCompression=false;
+
 // This Would disable some servers
 //PhpWsdlServers::$EnableHttp=false;// Disable the http webservice
 //PhpWsdlServers::$EnableJson=false;// Disable the JSON webservice

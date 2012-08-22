@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -66,12 +66,12 @@ class PhpWsdlProxy{
 		$call=($m->IsGlobal)
 			?$method					// Global method
 			:Array(						// Class method
-				PhpWsdl::$ProxyObject,
+				(is_null($m->Class))?PhpWsdl::$ProxyObject:$m->Class,
 				$method
 			);
-		// Call the target method and return the response
+		// Call the target method
 		PhpWsdl::Debug('Call the target method');
-		return (sizeof($param)<1)
+		$res=(sizeof($param)<1)
 			?call_user_func(
 					$call
 				)
@@ -79,5 +79,12 @@ class PhpWsdlProxy{
 					$call,
 					$param
 				);
+		// Return the encoded response
+		$type=(is_null($m->Return))
+			?null
+			:$m->Return->Name;
+		return (PhpWsdl::$EncodeProxyReturn&&!is_null($type))
+			?PhpWsdl::DoEncoding($type,$res,false,PhpWsdl::$ProxyServer)
+			:$res;
 	}
 }

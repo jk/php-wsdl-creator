@@ -12,16 +12,16 @@ class SoapDemo{
 	/**
 	 * Get a complex type object
 	 * 
-	 * @return ComplexTypeDemo The object
+	 * @return ComplexTypeDemoB The object
 	 */
 	public function GetComplexType(){
-		return new ComplexTypeDemo();
+		return new ComplexTypeDemoB();
 	}
 	
 	/**
 	 * Print an object
 	 * 
-	 * @param ComplexTypeDemo $obj The object
+	 * @param ComplexTypeDemoB $obj The object
 	 * @return string The result of print_r
 	 */
 	public function PrintComplexType($obj){
@@ -31,7 +31,7 @@ class SoapDemo{
 	/**
 	 * Print an array of objects
 	 * 
-	 * @param ComplexTypeDemoArray $arr A ComplexTypeDemo array
+	 * @param ComplexTypeDemoBArray $arr A ComplexTypeDemoB array
 	 * @return stringArray The results of print_r
 	 */
 	public function ComplexTypeArrayDemo($arr){
@@ -60,6 +60,7 @@ class SoapDemo{
 	 * This method has no parameters and no return value, but it is visible in WSDL, too
 	 */
 	public function DemoMethod(){
+		throw(new SoapFault('DemoFault','This method will only throw an exception'));
 	}
 	
 	/**

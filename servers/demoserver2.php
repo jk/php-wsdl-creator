@@ -13,6 +13,9 @@ if(!class_exists('PhpWsdlServers'))
 if(!class_exists('PhpWsdlJavaScriptPacker')) 
 	require_once('class.phpwsdl.servers-jspacker.php');
 
+// This disables response compression (some servers don't support that)
+PhpWsdlServers::$EnableCompression=false;
+
 // Run the PhpWsdl server in quick mode
 /*PhpWsdl::$Debugging=true;
 PhpWsdl::$DebugFile=PhpWsdl::$CacheFolder.'/debug.log';*/

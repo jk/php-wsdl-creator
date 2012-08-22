@@ -1,6 +1,58 @@
-Note: See the diff in the respository for other changes that are not 
+Note: See the diff in the repository for other changes that are not 
 documented here. Only smaller changes that not seem to be very important will 
 stay undocumented.
+
+?: 2.4
+Bugfix: Added XSD type gMonth to the list of basic types
+Bugfix: The NuSOAP adapter didn't notice the array type definition changes from 
+        version 2.3
+Bugfix: Endless loop if writing to the debug file didn't work
+Bugfix: The Servers extension produced invalid JSON JavaScript client code
+Changed: Download links won't be displayed anymore if the output of PHP was 
+         disabled f.e.
+Changed: PhpWsdl is now responsible for interpreting the @pw_set keyword
+Changed: The complex type classes from the generated PHP/JavaScript code now 
+         support constructor parameters. To enable the PHP constructor, have 
+         a look at the static PhpWsdlComplex::$DefaultEnablePhpConstructor 
+         property or the setting "phpconstructor" (@pw_set phpconstructor=1)
+Changed: PhpWsdlServers in XML RPC mode will recode complex types as object 
+         (the PHPs RPC-methods decode objects as array per default). To get the 
+         behavoir from version 2.3, you can set the 
+         PhpWsdlServers::$NoRpcRecode property to TRUE
+Changed: All documentation can now be found online at the Google Code Wiki of 
+         this project
+Changed: class.complextypedemo.php and demo2.php include enumeration 
+         and inherit demonstrations now
+Changed: The hook calling method didn't work with older PHP versions, it's 
+         strongly recommend to use PHP 5.2.10 or later. However, the change in 
+         this version should support older PHP versions.
+New: You can mix up handler methods in different classes when using the proxy 
+     class (see demo3.php)
+New: PhpWsdl allows you to mix up global and class methods (even from 
+     different classes and without the proxy) within one webservice (see 
+     demo7.php) when setting the PhpWsdl->CreateHandler property to TRUE
+New: The JavaScript proxy client of PhpWsdlServers does now support a callback 
+     data parameter (see democlient-json.html)
+New: The proxy class supports return value encodings (defined in 
+     PhpWsdl::$TypeEncoding) when setting the PhpWsdl::$EncodeProxyReturn to 
+     TRUE
+New: The SOAP client supports automatic parameter encoding (defined in 
+     PhpWsdl::$TypeEncoding) when setting the PhpWsdlClient->EncodeParameters 
+     to TRUE
+New: The PhpWsdlServers extension now supports a hook for encoding values 
+     from specific types. Per default basic types won't be encoded. You can 
+     encode them by yourself by hooking to EncodeTypeParameterHook and 
+     EncodeTypeReturnHook (or EncodeTypeHook for both). The same for decoding.
+New: Support for enumerations
+New: Support for inherited complex types. Note: Be careful with inheriting and 
+     SOAP. The native PHP SoapClient won't provide informations about parent 
+     classes to the PhpWsdlClient, so inherited complex types are not 
+     supported by PhpWsdlClient at all!
+New: Support for SOAP exceptions (see demo(2).php and 
+     class.complextypedemo.php)
+New: Debugging messages may be forwarded to a handler method
+New: Response compression may now be disabled in the Servers extension by 
+     setting PhpWsdlServers::$EnableCompression to FALSE 
 
 2011-08-20: 2.3
 Changed: The license.txt is now included in all downloadable packages

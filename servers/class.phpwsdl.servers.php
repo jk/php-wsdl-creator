@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -38,7 +38,7 @@ PhpWsdl::RegisterHook('CreateInstanceHook','servers','PhpWsdlServers::Constructo
 /**
  * Some http protocol servers (JSON, http, REST and XML RPC)
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlServers{
 	/**
@@ -53,6 +53,12 @@ class PhpWsdlServers{
 	 * @var boolean
 	 */
 	public static $DisableClientCache=true;
+	/**
+	 * Enable response compression?
+	 * 
+	 * @var boolean
+	 */
+	public static $EnableCompression=true;
 	/**
 	 * Enable the JSON server
 	 * 
@@ -83,6 +89,12 @@ class PhpWsdlServers{
 	 * @var boolean
 	 */
 	public static $EnableRpcNamedParameters=false;
+	/**
+	 * Disable recoding arrays as objects in XML RPC mode?
+	 * 
+	 * @var boolean
+	 */
+	public static $NoRpcRecode=false;
 	/**
 	 * Is this an RPC request?
 	 * 
@@ -471,21 +483,21 @@ class PhpWsdlServers{
 			return true;
 		PhpWsdl::Debug('Prepare a JSON/http/REST/RPC server');
 		$server=&$data['server'];
-		$json=self::$UseServer;
-		$data['soapserver']=$json;
+		$srv=self::$UseServer;
+		$data['soapserver']=$srv;
 		$useProxy=&$data['useproxy'];
 		$class=&$data['class'];
 		if($useProxy||!is_object($class)){
 			$temp=($useProxy)?'PhpWsdlProxy':$class;
 			if(!is_null($temp)){
 				PhpWsdl::Debug('Setting server class '.$temp);
-				$json->ClassName=$temp;
+				$srv->ClassName=$temp;
 			}else{
 				PhpWsdl::Debug('No server class or object');
 			}
 		}else{
 			PhpWsdl::Debug('Setting server object '.get_class($class));
-			$json->Object=$class;
+			$srv->Object=$class;
 		}
 		return false;
 	}
@@ -737,26 +749,30 @@ class PhpWsdlServers{
 		$temp=Array('SOAP');
 		if(self::$EnableJson){
 			$temp[]='JSON';
-			$url=self::$UseServer->GetJsonPhpUri();
-			$res[]='<p>PHP JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
-			$url=self::$UseServer->GetJsonJsUri();
-			$res[]='<p>JavaScript JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
-			if(self::IsJsPackerAvailable()){
-				$url=self::$UseServer->GetJsonJsUri().'&min';
-				$res[]='<p>Compressed JavaScript JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+			if(!$server->ForceNotOutputJsonPhp){
+				$url=self::$UseServer->GetJsonPhpUri();
+				$res[]='<p>PHP JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+			}
+			if(!$server->ForceNotOutputJsonJs){
+				$url=self::$UseServer->GetJsonJsUri();
+				$res[]='<p>JavaScript JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+				if(self::IsJsPackerAvailable()){
+					$url=self::$UseServer->GetJsonJsUri().'&min';
+					$res[]='<p>Compressed JavaScript JSON client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
+				}
 			}
 		}
-		if(self::$EnableRpc){
+		if(self::$EnableRpc&&!$server->ForceNotOutputRpcPhp){
 			$temp[]='XML RPC';
 			$url=self::$UseServer->GetRpcPhpUri();
 			$res[]='<p>PHP XML RPC client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
 		}
-		if(self::$EnableHttp){
+		if(self::$EnableHttp&&!$server->ForceNotOutputHttpPhp){
 			$temp[]='http';
 			$url=self::$UseServer->GetHttpPhpUri();
 			$res[]='<p>PHP http client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
 		}
-		if(self::$EnableRest){
+		if(self::$EnableRest&&!$server->ForceNotOutputRestPhp){
 			$temp[]='REST';
 			$url=self::$UseServer->GetRestPhpUri();
 			$res[]='<p>PHP REST client download URI: <span class="pre"><a href="'.$url.'">'.$url.'</a></span></p>';
@@ -822,26 +838,28 @@ class PhpWsdlServers{
 		$cnt=&$data['cnt'];
 		$server=$data['server'];
 		if(self::$EnableJson){
-			$cnt++;
-			$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.php:'.self::$UseServer->GetJsonPhpUri();
-			if(self::$AttachJsInPdf){
+			if(!$server->ForceNotOutputJsonPhp){
+				$cnt++;
+				$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.php:'.self::$UseServer->GetJsonPhpUri();
+			}
+			if(self::$AttachJsInPdf&&!$server->ForceNotOutputJsonJs){
 				$cnt++;
 				$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.js:'.self::$UseServer->GetJsonJsUri();
-				if(self::$UseServer->IsJsPackerAvailable()){
+				if(self::IsJsPackerAvailable()){
 					$cnt++;
 					$temp['attachment_'.$cnt]=$server->Name.'.jsonclient.min.js:'.self::$UseServer->GetJsonJsUri().'&min';
 				}
 			}
 		}
-		if(self::$EnableRpc){
+		if(self::$EnableRpc&&!$server->ForceNotOutputRpcPhp){
 			$cnt++;
 			$temp['attachment_'.$cnt]=$server->Name.'.xmlrpcclient.php:'.self::$UseServer->GetRpcPhpUri();
 		}
-		if(self::$EnableHttp){
+		if(self::$EnableHttp&&!$server->ForceNotOutputHttpPhp){
 			$cnt++;
 			$temp['attachment_'.$cnt]=$server->Name.'.httpclient.php:'.self::$UseServer->GetHttpPhpUri();
 		}
-		if(self::$EnableRest){
+		if(self::$EnableRest&&!$server->ForceNotOutputRestPhp){
 			$cnt++;
 			$temp['attachment_'.$cnt]=$server->Name.'.restclient.php:'.self::$UseServer->GetRestPhpUri();
 		}
@@ -930,14 +948,15 @@ class PhpWsdlServers{
 			if(PhpWsdl::CallHook('ServersBeginOutputJsHook',$data)){
 				$res[]='var '.$this->Server->Name.'JsonClient=function(){';
 				$res[]='	this._EndPoint="'.$this->Server->EndPoint.'";';
-				$res[]='	this._Call=function(method,param,cb){';
+				$res[]='	this._Call=function(method,param,cb,cbData){';
 				$res[]='		var server=(window.XMLHttpRequest)?new XMLHttpRequest():new ActiveXObject("Microsoft.XMLHTTP");';
 				$res[]='		server.open("POST",this._EndPoint,cb!=null);';
 				$res[]='		server.setRequestHeader("Content-Type","application/x-www-form-urlencoded");';
-				$res[]='		var req="JSON="+encodeURIComponent(JSON.stringify({call:method,param:(param)?param:[]}));';
+				$res[]='		var req="json="+encodeURIComponent(JSON.stringify({call:method,param:(typeof(param)!="undefined")?param:[]}));';
 				$res[]='		if(cb){';
 				$res[]='			server.onreadystatechange=this._EndCall;';
 				$res[]='			server.cb=cb;';
+				$res[]='			server.cbData=(typeof(cbData)!="undefined")?cbData:null;';
 				$res[]='			server.send(req);';
 				$res[]='			return server;';
 				$res[]='		}else{';
@@ -953,8 +972,10 @@ class PhpWsdlServers{
 				$res[]='			return;';
 				$res[]='		if(server.status!=200)';
 				$res[]='			throw(new Exception("AJAX error "+server.status+": "+server.statusText));';
-				$res[]='		server.cb(JSON.parse(server.responseText));';
+				$res[]='		if(server.cb)';
+				$res[]='			server.cb(JSON.parse(server.responseText),server.cbData);';
 				$res[]='		server.cb=null;';
+				$res[]='		server.cbData=null;';
 				$res[]='		delete(server);';
 				$res[]='	};';
 			}
@@ -972,22 +993,14 @@ class PhpWsdlServers{
 						)
 					)
 				){
-					$res[]='	this.'.$m->Name.'=function(';
+					$temp=Array();
 					$j=-1;
 					$pLen=sizeof($m->Param);
 					while(++$j<$pLen)
-						$res[]='		'.$m->Param[$j]->Name.',';
-					$res[]='		_cb';
-					$res[]='	){';
-					$res[]='		return this._Call(';
-					$res[]='			"'.$m->Name.'",';
-					$res[]='			[';
-					$j=-1;
-					while(++$j<$pLen)
-						$res[]='			'.$m->Param[$j]->Name.(($j<$eLen-1)?',':'');
-					$res[]='			],';
-					$res[]='			(_cb)?_cb:null';
-					$res[]='		);';
+						$temp[]=$m->Param[$j]->Name;
+					$temp=implode(',',$temp);
+					$res[]='	this.'.$m->Name.'=function('.$temp.(($temp!='')?',':'').'_cb,_cbData){';
+					$res[]='		return this._Call("'.$m->Name.'",['.$temp.'],(typeof(_cb)!="undefined")?_cb:null,(typeof(_cbData)!="undefined")?_cbData:null);';
 					$res[]='	};';
 				}
 			}
@@ -995,6 +1008,8 @@ class PhpWsdlServers{
 			$len=sizeof($this->Server->Types);
 			while(++$i<$len){
 				$t=$this->Server->Types[$i];
+				if($t->IsArray)
+					continue;
 				if(PhpWsdl::CallHook(
 						'ServersOutputTypeJsHook',
 						array_merge(
@@ -1006,18 +1021,44 @@ class PhpWsdlServers{
 					)
 				){
 					$eLen=sizeof($t->Elements);
-					if($eLen<1)
-						continue;
-					$res[]='	this.'.$t->Name.'=function(){';
 					$j=-1;
-					while(++$j<$eLen)
-						$res[]='		this.'.$t->Elements[$j]->Name.'=null;';
-					$res[]='	};';
+					$class=get_class($t);
+					switch($class){
+						case 'PhpWsdlComplex':
+							$temp=Array();
+							if(!is_null($t->Inherit)){
+								$it=$this->Server->GetType($t->Inherit);
+								$j=-1;
+								$tLen=sizeof($it->Elements);
+								while(++$j<$tLen)
+									$temp[]=$it->Elements[$j]->Name;
+							}else{
+								$tLen=0;
+							}
+							$j=-1;
+							while(++$j<$eLen)
+								$temp[]=$t->Elements[$j]->Name;
+							$tLen+=$eLen;
+							$res[]='	this.'.$t->Name.'=function('.implode(',',$temp).'){';
+							$j=-1;
+							while(++$j<$tLen)
+								$res[]='		this.'.$temp[$j].'=(typeof('.$temp[$j].')!="undefined")?'.$temp[$j].':null;';
+							$res[]='	};';
+							break;
+						case 'PhpWsdlEnum':
+							$res[]='	this.'.$t->Name.'={';
+							while(++$j<$eLen)
+								$res[]='		"'.$t->Elements[$j].'":"'.$t->Elements[$j].'"'.(($j<$eLen-1)?',':'');
+							$res[]='	};';
+							break;
+						default:
+							PhpWsdl::Debug('WARNING: Could not create JavaScript code for unknown type "'.$class.'"!');
+							break;
+					}
 				}
 			}
-			if(PhpWsdl::CallHook('ServersEndOutputJsHook',$data)){
-				$res[]='};';
-			}
+			PhpWsdl::CallHook('ServersEndOutputJsHook',$data);
+			$res[]='};';
 			$res=utf8_encode(implode("\n",$res));
 			$this->JsonJs=$res;
 		}
@@ -1124,10 +1165,7 @@ class PhpWsdlServers{
 					if($i>$tLen)
 						break;
 					PhpWsdl::Debug('Found parameter "'.$p->Name.'"');
-					PhpWsdl::Debug('I '.$i);
-					PhpWsdl::Debug('tLen '.$tLen);
-					PhpWsdl::Debug(urldecode($temp[$i+2]));
-					$req['param'][]=(in_array($p->Type,PhpWsdl::$BasicTypes))?urldecode($temp[$i+2]):json_decode(urldecode($temp[$i+2]));
+					$req['param'][]=self::DecodeType($p->Type,urldecode($temp[$i+2]),true);
 				}
 			}else{
 				// Fixed parameter handling
@@ -1158,7 +1196,7 @@ class PhpWsdlServers{
 						$p=$method->Param[$i];
 						$name=$p->Name;
 						if(isset($map[$name])){
-							$temp[]=(in_array($p->Type,PhpWsdl::$BasicTypes))?urldecode($map[$name]):json_decode(urldecode($map[$name]));
+							$temp[]=self::DecodeType($p->Type,urldecode($map[$name]),true);
 							$lastValue=$i;
 						}else{
 							PhpWsdl::Debug('Parameter "'.$p->Name.'" not found');
@@ -1215,9 +1253,10 @@ class PhpWsdlServers{
     			)
     		)
     	){
-			ob_start('ob_gzhandler');
+    		if(self::$EnableCompression)
+    			ob_start('ob_gzhandler');
 			$this->PlainTextHeaders();
-    		echo (in_array($method->Return->Type,PhpWsdl::$BasicTypes))?$temp:json_encode($temp);
+			echo self::EncodeType($method->Return->Type,$temp);
     	}
     	return false;
 	}
@@ -1230,6 +1269,7 @@ class PhpWsdlServers{
 	public function HandleJsonRequest(){
     	// Decode the JSON request
     	$json=(self::HasParam('json'))?'json':'JSON';
+    	$json=preg_replace('/([^\\])\\n/','\\n',$json);
     	$req=json_decode(self::GetParam($json));
 		if(is_null($req)||!is_object($req))
 			throw(new Exception('Invalid JSON object'));
@@ -1250,7 +1290,8 @@ class PhpWsdlServers{
     		throw(new Exception('Method "'.$req['call'].'" not exists'));
     	// Execute the method and output the response
     	$temp=$this->HandleRequest($req,$method);
-		ob_start('ob_gzhandler');
+    	if(self::$EnableCompression)
+    		ob_start('ob_gzhandler');
 		$this->PlainTextHeaders();
 		echo json_encode($temp);
     	return false;
@@ -1290,7 +1331,7 @@ class PhpWsdlServers{
 	    			break;
 	    		}
 	    		$temp=self::GetParam($method->Param[$i]->Name);
-	    		$req['param'][]=(in_array($p->Type,PhpWsdl::$BasicTypes))?$temp:json_decode($temp);
+	    		$req['param'][]=self::DecodeType($p->Type,$temp,true);
 	    	}
     	}
     	if(PhpWsdl::$Debugging)
@@ -1309,9 +1350,10 @@ class PhpWsdlServers{
     			)
     		)
     	){
-			ob_start('ob_gzhandler');
+    		if(self::$EnableCompression)
+				ob_start('ob_gzhandler');
 			$this->PlainTextHeaders();
-    		echo (in_array($method->Return->Type,PhpWsdl::$BasicTypes))?$temp:json_encode($temp);
+			echo self::EncodeType($method->Return->Type,$temp);
     	}
     	return false;
 	}
@@ -1332,7 +1374,8 @@ class PhpWsdlServers{
 			xmlrpc_server_register_method($rpc,$this->Server->Methods[$i]->Name,Array($this,'RpcCallHandler'));
 		$temp=xmlrpc_server_call_method($rpc,file_get_contents('php://input'),null);
 		$this->XmlHeaders();
-		ob_start('ob_gzhandler');
+    	if(self::$EnableCompression)
+			ob_start('ob_gzhandler');
 		echo $temp;
 		return false;
 	}
@@ -1390,9 +1433,76 @@ class PhpWsdlServers{
 				$req['param']=array_slice($req['param'],0,$lastValue+1);
 			}
 		}
+		// Do recoding
+		if(!self::$NoRpcRecode){
+			PhpWsdl::Debug('Recoding parameters');
+			$i=-1;
+			$len=sizeof($req['param']);
+			while(++$i<$len){
+				if(is_null($req['param'][$i]))
+					continue;
+				$p=$m->Param[$i];
+				if(in_array($p->Type,PhpWsdl::$BasicTypes)){
+					PhpWsdl::Debug('"'.$p->Name.'" is a basic type');
+					continue;
+				}
+				$t=$this->Server->GetType($p->Type);
+				if($t->IsArray){
+					PhpWsdl::Debug('"'.$p->Name.'" is an array');
+					continue;
+				}
+				if(get_class($t)=='PhpWsdlEnum'&&in_array($p->Type,PhpWsdl::$BasicTypes)){
+					PhpWsdl::Debug('"'.$p->Name.'" is an basic type enumeration');
+					continue;
+				}
+				PhpWsdl::Debug('Recoding of "'.$p->Name.'" required');
+				$req['param'][$i]=$this->RecodeParameter($req['param'][$i],$t,$server);
+			}
+		}
     	if(PhpWsdl::$Debugging)
     		PhpWsdl::Debug('Parameters: '.print_r($req['param'],true));
 		return $this->HandleRequest($req,$m);
+	}
+	
+	/**
+	 * Recode an hash array into an object
+	 * 
+	 * @param array $received The received hash array
+	 * @param PhpWsdlObject $type The type
+	 * @param PhpWsdl $server The PhpWsdl object
+	 * @return object The object
+	 */
+	private function RecodeParameter($received,$type,$server){
+		PhpWsdl::Debug('Recode "'.$type->Name.'"');
+		$obj=new stdClass();
+		$i=-1;
+		$len=sizeof($type->Elements);
+		while(++$i<$len){
+			$e=$type->Elements[$i];
+			$name=$e->Name;
+			if(!in_array($e->Type,PhpWsdl::$BasicTypes)){
+				$t=$server->GetType($e->Type);
+				if(is_null($t))
+					throw(new Exception('Could not recode "'.$e->Type.'"'));
+				if(get_class($t)=='PhpWsdlEnum'){
+					$basic=in_array($t->Type,PhpWsdl::$BasicTypes);
+				}else{
+					$basic=false;
+					$t=null;
+				}
+			}else{
+				$basic=true;
+				$t=null;
+			}
+			if(!$basic){
+				PhpWsdl::Debug('Recode element "'.$name.'" as object');
+				$obj[$name]=$this->RecodeParameter($received[$name],$t,$server);
+			}else{
+				PhpWsdl::Debug('Set element "'.$name.'"');
+				$obj[$name]=$received[$name];
+			}
+		}
+		return $obj;
 	}
 	
 	/**
@@ -1569,5 +1679,81 @@ class PhpWsdlServers{
 	 */
 	public static function IsJsPackerAvailable(){
 		return PhpWsdl::HasHookHandler('ServersPackJsHook')||class_exists('PhpWsdlJavaScriptPacker');
+	}
+	
+	/**
+	 * Encode a value as parameter or return value
+	 * 
+	 * @param string $type The type name
+	 * @param mixed $value The value to be encoded
+	 * @param boolean $parameter Is this a parameter value? (default: FALSE)
+	 * @return mixed The encoded value
+	 */
+	public static function EncodeType($type,$value,$parameter=false){
+		$res=null;
+		$data=Array(
+			'type'			=>	&$type,
+			'value'			=>	&$value,
+			'parameter'		=>	&$parameter,
+			'res'			=>	&$res
+		);
+		if(!PhpWsdl::CallHook(
+				'EncodeTypeHook',
+				$data
+			)
+		)
+			return $res;
+		if(!PhpWsdl::CallHook(
+				'EncodeType'.(($parameter)?'Parameter':'Return').'Hook',
+				$data
+			)
+		)
+			return $res;
+		if(in_array($type,PhpWsdl::$BasicTypes))
+			return $value;
+		$t=self::$UseServer->Server->GetType($type);
+		if(is_null($t))
+			throw(new Exception('Could not encode type "'.$type.'"'));
+		if(get_class($t)=='PhpWsdlEnum')
+			$type=$t->Type;
+		return (in_array($type,PhpWsdl::$BasicTypes))?$value:json_encode($value);
+	}
+	
+	/**
+	 * Decode a parameter or a return value
+	 * 
+	 * @param string $type The type name
+	 * @param mixed $value The value to be decoded
+	 * @param boolean $parameter Is this a parameter value? (default: FALSE)
+	 * @return mixed The decoded value
+	 */
+	public static function DecodeType($type,$value,$parameter=false){
+		$res=null;
+		$data=Array(
+			'type'			=>	&$type,
+			'value'			=>	&$value,
+			'parameter'		=>	&$parameter,
+			'res'			=>	&$res
+		);
+		if(!PhpWsdl::CallHook(
+				'DecodeTypeHook',
+				$data
+			)
+		)
+			return $res;
+		if(!PhpWsdl::CallHook(
+				'DecodeType'.(($parameter)?'Parameter':'Return').'Hook',
+				$data
+			)
+		)
+			return $res;
+		if(in_array($type,PhpWsdl::$BasicTypes))
+			return $value;
+		$t=self::$UseServer->Server->GetType($type);
+		if(is_null($t))
+			throw(new Exception('Could not decode type "'.$type.'"'));
+		if(get_class($t)=='PhpWsdlEnum')
+			$type=$t->Type;
+		return (in_array($type,PhpWsdl::$BasicTypes))?$value:json_decode($value);
 	}
 }

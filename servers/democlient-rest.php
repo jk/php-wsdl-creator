@@ -31,5 +31,6 @@ echo "\n";
 $rest='/PrintComplexType/'.urlencode(json_encode($temp));
 echo "PrintComplexType:\n";
 echo htmlentities(file_get_contents($endPoint.$rest));
+
 echo '</pre>';
 exit;

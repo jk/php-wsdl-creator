@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -26,7 +26,7 @@ PhpWsdl::RegisterHook('CreateObjectHook','internalcomplex','PhpWsdlComplex::Crea
 /**
  * This class creates complex types (classes or arrays)
  * 
- * @author Andreas Zimmermann, wan24.de
+ * @author Andreas Müller-Saala, wan24.de
  */
 class PhpWsdlComplex extends PhpWsdlObject{
 	/**
@@ -35,6 +35,12 @@ class PhpWsdlComplex extends PhpWsdlObject{
 	 * @var string
 	 */
 	public $Type=null;
+	/**
+	 * Name of the complex type to inherit from
+	 * 
+	 * @var string
+	 */
+	public $Inherit=null;
 	/**
 	 * A list of elements, if this type is a class
 	 * 
@@ -48,11 +54,23 @@ class PhpWsdlComplex extends PhpWsdlObject{
 	 */
 	public $IsArray;
 	/**
+	 * Enable creating a PHP constructor that requires all parameters?
+	 * 
+	 * @var boolean
+	 */
+	public $EnablePhpConstructor=false;
+	/**
 	 * Disable definition of arrays with the "Array" postfix in the type name?
 	 * 
 	 * @var boolean
 	 */
 	public static $DisableArrayPostfix=false;
+	/**
+	 * Create a PHP constructor that requires all parameters per default?
+	 * 
+	 * @var boolean
+	 */
+	public static $DefaultEnablePhpConstructor=false;
 	
 	/**
 	 * Constructor
@@ -70,9 +88,17 @@ class PhpWsdlComplex extends PhpWsdlObject{
 				$this->Type=substr($this->Name,0,strlen($this->Name)-5);
 		}
 		$this->Elements=$el;
-		if(!is_null($settings))
+		$this->EnablePhpConstructor=self::$DefaultEnablePhpConstructor;
+		if(!is_null($settings)){
 			if(isset($settings['isarray']))
 				$this->IsArray=$settings['isarray'];
+			if(isset($settings['phpconstructor']))
+				$this->EnablePhpConstructor=$settings['phpconstructor']=='1'||$settings['phpconstructor']=='true';
+			if(isset($settings['type']))
+				$this->IsArray=$settings['type'];
+			if(isset($settings['inherit']))
+				$this->Inherit=$settings['inherit'];
+		}
 	}
 	
 	/**
@@ -91,19 +117,31 @@ class PhpWsdlComplex extends PhpWsdlObject{
 		}
 		if(!$this->IsArray){
 			PhpWsdl::Debug('Create WSDL definition for type '.$this->Name.' as type');
-			$res[]='<s:sequence>';
-			$i=-1;
-			$len=sizeof($this->Elements);
-			while(++$i<$len)
-				$res[]=$this->Elements[$i]->CreateElement($pw);
-			$res[]='</s:sequence>';
+			if(is_null($this->Inherit)){
+				$res[]='<s:sequence>';
+				$i=-1;
+				$len=sizeof($this->Elements);
+				while(++$i<$len)
+					$res[]=$this->Elements[$i]->CreateElement($pw);
+				$res[]='</s:sequence>';
+			}else{
+				PhpWsdl::Debug('Inherit from "'.$this->Inherit.'"');
+				$res[]='<s:complexContent>';
+				$res[]='<s:extension base="tns:'.$this->Inherit.'">';
+				$res[]='<s:sequence>';
+				$i=-1;
+				$len=sizeof($this->Elements);
+				while(++$i<$len)
+					$res[]=$this->Elements[$i]->CreateElement($pw);
+				$res[]='</s:sequence>';
+				$res[]='</s:extension>';
+				$res[]='</s:complexContent>';
+			}
 		}else{
 			PhpWsdl::Debug('Create WSDL definition for type '.$this->Name.' as array');
 			$res[]='<s:complexContent>';
 			$res[]='<s:restriction base="soapenc:Array">';
-			$res[]='<s:attribute ref="soapenc:arrayType" wsdl:arrayType="';
-			$res[sizeof($res)-1].=(in_array($this->Type,PhpWsdl::$BasicTypes))?'s':'tns';
-			$res[sizeof($res)-1].=':'.$this->Type.'[]" />';
+			$res[]='<s:attribute ref="soapenc:arrayType" wsdl:arrayType="'.PhpWsdl::TranslateType($this->Type).'[]" />';
 			$res[]='</s:restriction>';
 			$res[]='</s:complexContent>';
 		}
@@ -136,10 +174,13 @@ class PhpWsdlComplex extends PhpWsdlObject{
 	 */
 	public function CreateTypeHtml($data){
 		PhpWsdl::Debug('CreateTypeHtml for '.$data['type']->Name);
+		$server=$data['server'];
 		$res=&$data['res'];
 		$t=&$data['type'];
 		$res[]='<h3>'.$t->Name.'</h3>';
 		$res[]='<a name="'.$t->Name.'"></a>';
+		if(!is_null($t->Inherit))
+			$res[]='<p>This type inherits all properties from <a href="#'.$t->Inherit.'"><span class="lightBlue">'.$t->Inherit.'</span></a>.</p>';
 		$eLen=sizeof($t->Elements);
 		if($t->IsArray){
 			// Array type
@@ -192,15 +233,47 @@ class PhpWsdlComplex extends PhpWsdlObject{
 			$res[]=" * ".implode("\n * ",explode("\n",$this->Docs));
 			$res[]=" *";
 		}
+		$temp=Array();
 		$i=-1;
 		$eLen=sizeof($this->Elements);
 		while(++$i<$eLen){
 			$e=$this->Elements[$i];
-			$res[]=" * @pw_element ".$e->Type." \$".$e->Name.((!is_null($e->Docs))?" ".implode("\n\t * ",explode("\n",$e->Docs)):"");
+			$temp[]='$'.$e->Name;
+			$res[]=" * @pw_element ".$e->Type." \$".$e->Name.((!is_null($e->Docs))?' '.$e->Docs:'');
 		}
 		$res[]=" * @pw_complex ".$this->Name;
 		$res[]=" */";
-		$res[]="class ".$this->Name."{";
+		$res[]="class ".$this->Name.((is_null($this->Inherit))?'':' extends '.$this->Inherit)."{";
+		if($eLen>0&&$this->EnablePhpConstructor){
+			$res[]="\t/**";
+			$res[]="\t * Constructor with parameters (all required!)";
+			$res[]="\t *";
+			$i=-1;
+			while(++$i<$eLen){
+				$e=$this->Elements[$i];
+				$res[]="\t * @param ".$e->Type." ".$temp[$i].((!is_null($e->Docs))?' '.$e->Docs:'');
+			}
+			if(!is_null($this->Inherit)){
+				$it=$server->GetType($this->Inherit);
+				if($it->EnablePhpConstructor){
+					$i=-1;
+					$tLen=sizeof($it->Elements);
+					while(++$i<$tLen){
+						$e=$it->Elements[$i];
+						$tempb[]='$'.$e->Name;
+						$res[]=" * @param ".$e->Type." \$".$e->Name.((!is_null($e->Docs))?' '.$e->Docs:'');
+					}
+				}
+			}
+			$res[]="\t */";
+			$res[]="\tpublic function ".$this->Name."(".implode(',',$temp)."){";
+			if(!is_null($this->Inherit)&&$it->EnablePhpConstructor)
+				$res[]="\t\tparent::".$this->Inherit."(".implode(',',$tempb).");";
+			$i=-1;
+			while(++$i<$eLen)
+				$res[]="\t\t\$this->".$this->Elements[$i]->Name."=".$temp[$i];
+			$res[]="\t}";
+		}
 		$i=-1;
 		while(++$i<$eLen){
 			$e=$this->Elements[$i];

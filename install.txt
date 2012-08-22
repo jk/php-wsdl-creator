@@ -24,7 +24,7 @@ To see a human readable HTML interface description, simply use this location:
 
 http://your-server.com/demo.php
 
-To download a PHP SOAP client proxy class, use this locatioN:
+To download a PHP SOAP client proxy class, use this location:
 
 http://your-server.com/demo.php?PHPSOAPCLIENT
 

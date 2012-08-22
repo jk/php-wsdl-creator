@@ -48,6 +48,9 @@ To use PhpWsdl you need these classes:
 - class.phpwsdlelement.php
 	Represents an element of a complex type
 
+- class.phpwsdlenum.php
+	Represents an enumeration
+
 - class.phpwsdlformatter.php
 	A PHP class to format a XML string human readable
 
@@ -168,7 +171,8 @@ To see an example how to use the proxy, please look into demo3.php.
 
 Another solution is to work with complex types that serve the parameters. Then 
 every method that supports NULL in parameters needs to use a complex type as 
-the only one parameter that includes the parameters as elements.
+the only one parameter that includes the parameters as elements. In this case 
+you don't need the proxy class.
 
 Demonstrations
 ~~~~~~~~~~~~~~
@@ -265,6 +269,11 @@ download or directly from the SVN respository. The AJAX proxy is using JSON -
 have look at http://www.json.org/js.html for informations how to en- and 
 decode objects to/from JSON in your JavaScript application.
 
+But if you use JavaScript at the client side you should have a look at the 
+PhpWsdlServers extension that serves a JSON webservice and produces JavaScript 
+client code for you. Since I added the JSON webservice I don't use SOAP with 
+JavaScript clients in my projects anymore.
+
 SOAP with Microsoft Visual Studio
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All tests using Microsoft Visual Studio 2010 ran without any problems. You can 
@@ -279,7 +288,7 @@ bundled with an individual SLA for your company, if required - contact me with
 email to schick_was_an at hotmail dot com for details.
 
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -301,6 +310,9 @@ If you need help implementing PhpWsdl, I may help you with email. Contact me
 at schick_was_an at hotmail dot com. If you found an error, please report it 
 at the project homepage.
 
+The is a online wiki at the project homepage, where you may find some 
+additional documentation and help, too.
+
 Project homepage
 ~~~~~~~~~~~~~~~~
 PhpWsdl is hosted by Google Code. The project homepage is located at
@@ -310,7 +322,8 @@ http://code.google.com/p/php-wsdl-creator/
 This location should be the only source for downloads, source, Wikis and 
 reported issues.
 
-You can find my German speaking homepage here:
+You can find my German speaking homepage here (automatic language translation 
+is available via Google Translate plugin):
 
 http://wan24.de
 

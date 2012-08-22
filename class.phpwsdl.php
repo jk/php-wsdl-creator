@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -41,6 +41,7 @@ require_once(dirname(__FILE__).'/class.phpwsdlparam.php');
 require_once(dirname(__FILE__).'/class.phpwsdlmethod.php');
 require_once(dirname(__FILE__).'/class.phpwsdlelement.php');
 require_once(dirname(__FILE__).'/class.phpwsdlcomplex.php');
+require_once(dirname(__FILE__).'/class.phpwsdlenum.php');
 
 // Do things after the environment is configured
 PhpWsdl::PostInit();
@@ -48,9 +49,9 @@ PhpWsdl::PostInit();
 /**
  * PhpWsdl class
  * 
- * @author Andreas Zimmermann
- * @copyright ©2011 Andreas Zimmermann, wan24.de
- * @version 2.3
+ * @author Andreas Müller-Saala
+ * @copyright ©2011 Andreas Müller-Saala, wan24.de
+ * @version 2.4
  */
 class PhpWsdl{
 	/**
@@ -58,7 +59,7 @@ class PhpWsdl{
 	 * 
 	 * @var string
 	 */
-	public static $VERSION='2.3';
+	public static $VERSION='2.4';
 	/**
 	 * Set this to TRUE to enable the autorun in quick mode
 	 * 
@@ -89,6 +90,19 @@ class PhpWsdl{
 	 * @var boolean
 	 */
 	public static $UseProxyWsdl=false;
+	/**
+	 * Type encoding settings
+	 * 
+	 * @var array
+	 */
+	public static $TypeEncoding=null;
+	/**
+	 * Encode return values when using the proxy class?
+	 * Note: All encoding have to be defined in the PhpWsdl::$TypeEncoding
+	 * 
+	 * @var boolean
+	 */
+	public static $EncodeProxyReturn=false;
 	/**
 	 * The name
 	 * 
@@ -170,6 +184,24 @@ class PhpWsdl{
 	 */
 	public $WSDL=null;
 	/**
+	 * Create a webservice handler class at runtime?
+	 * 
+	 * @var boolean
+	 */
+	public $CreateHandler=false;
+	/**
+	 * The created handler class
+	 * 
+	 * @var PhpWsdlHandler
+	 */
+	public $Handler=null;
+	/**
+	 * The handler class PHP code
+	 * 
+	 * @var string
+	 */
+	public $HandlerPhp=null;
+	/**
 	 * UTF-8 encoded HTML from the last OutputHtml method call
 	 * 
 	 * @var string
@@ -200,6 +232,7 @@ class PhpWsdl{
 		'dateTime',
 		'float',
 		'gDay',
+		'gMonth',
 		'gMonthDay',
 		'gYearMonth',
 		'gYear',
@@ -383,6 +416,12 @@ class PhpWsdl{
 	 * @var boolean
 	 */
 	public static $DebugBackTrace=false;
+	/**
+	 * A debugging handler
+	 * 
+	 * @var string|array
+	 */
+	public static $DebugHandler=null;
 	/**
 	 * WSDL namespaces
 	 * 
@@ -627,7 +666,7 @@ class PhpWsdl{
 	 * @param int $timeout The caching timeout in seconds or NULL to use the previous value or the default (3600) (default: NULL)
 	 */
 	public static function EnableCache($folder=null,$timeout=null){
-		if(is_null($folder)){
+		if(is_null($folder)&&is_null(self::$CacheFolder)){
 			if(self::IsCacheFolderWriteAble('./cache')){
 				$folder='./cache';
 			}else if(self::IsCacheFolderWriteAble(dirname(__FILE__).'/cache')){
@@ -756,6 +795,25 @@ class PhpWsdl{
 		$fLen=sizeof($this->Files);
 		while(++$i<$fLen)
 			if(preg_match('/^(.*\/)?'.$file.'$/i',$this->Files[$i]))
+				return true;
+		return false;
+	}
+	
+	/**
+	 * Determine if a type is used as exception type for a method
+	 * 
+	 * @param string|PhpWsdlComplex $type A type name or object instance
+	 * @return boolean Used as exception type?
+	 */
+	public function IsException($type){
+		if(is_object($type))
+			$type=$type->Name;
+		if(PhpWsdlMethod::$DefaultException==$type)
+			return true;
+		$i=-1;
+		$len=sizeof($this->Methods);
+		while(++$i<$len)
+			if($this->Methods[$i]->Exception==$type)
 				return true;
 		return false;
 	}
@@ -1103,6 +1161,26 @@ class PhpWsdl{
 	}
 	
 	/**
+	 * Interpret a setting
+	 * 
+	 * @param array $data The parser data
+	 * @return boolean Response
+	 */
+	public static function InterpretSetting($data){
+		$info=explode(' ',$data['keyword'][1],2);
+		if(sizeof($info)<1)
+			return true;
+		self::Debug('Interpret setting '.$info[0]);
+		$info=explode('=',$info[0],2);
+		if(sizeof($info)>1){
+			$data['settings'][$info[0]]=$info[1];
+		}else if(isset($data['settings'][$info[0]])){
+			unset($data['settings'][$info[0]]);
+		}
+		return false;
+	}
+	
+	/**
 	 * Parse source files for WSDL definitions in comments
 	 * 
 	 * @param boolean $init Empty the Methods and the Types properties? (default: FALSE)
@@ -1300,14 +1378,19 @@ class PhpWsdl{
 				'url'			=>	$this->GetDocUri()
 			));
 			if($temp['attachments']=='1'){
-				$temp['attachment_1']=$this->Name.'.wsdl:'.$this->GetWsdlUri();
-				$cnt=1;
-				if($this->ParseDocs&&$this->IncludeDocs){
-					$cnt=2;
-					$temp['attachment_2']=$this->Name.'-doc.wsdl:'.$this->GetWsdlUri().'&readable';
+				$cnt=0;
+				if(!$this->ForceNotOutputWsdl){
+					$cnt++;
+					$temp['attachment_'.$cnt]=$this->Name.'.wsdl:'.$this->GetWsdlUri();
+					if($this->ParseDocs&&$this->IncludeDocs){
+						$cnt++;
+						$temp['attachment_'.$cnt]=$this->Name.'-doc.wsdl:'.$this->GetWsdlUri().'&readable';
+					}
 				}
-				$cnt++;
-				$temp['attachment_'.$cnt]=$this->Name.'.soapclient.php:'.$this->GetPhpUri();
+				if(!$this->ForceNotOutputPhp){
+					$cnt++;
+					$temp['attachment_'.$cnt]=$this->Name.'.soapclient.php:'.$this->GetPhpUri();
+				}
 				self::CallHook(
 					'PdfAttachmentHook',
 					Array(
@@ -1319,6 +1402,8 @@ class PhpWsdl{
 						'types'			=>	&$types
 					)
 				);
+				if($cnt<1)
+					unset($temp['attachments']);
 			}
 			$options=Array();
 			$keys=array_keys($temp);
@@ -1377,10 +1462,13 @@ class PhpWsdl{
 		$server=$data['server'];
 		$res[]='<h1>'.$server->Name.' SOAP WebService interface description</h1>';
 		$res[]='<p>Endpoint URI: <span class="pre">'.$server->EndPoint.'</span></p>';
-		$res[]='<p>WSDL URI: <span class="pre"><a href="'.$server->GetWsdlUri().'&readable">'.$server->GetWsdlUri().'</a></span></p>';
-		$res[]='<p>PHP SOAP client download URI: <span class="pre"><a href="'.$server->GetPhpUri().'">'.$server->GetPhpUri().'</a></span></p>';
-		if(self::$HTML2PDFSettings['attachments']=='1'&&!is_null(self::$HTML2PDFLicenseKey))
-			$res[]='<p class="print">The WSDL files and client proxy class(es) are attached to this PDF documentation.</p>';
+		if(!$server->ForceNotOutputWsdl)
+			$res[]='<p>WSDL URI: <span class="pre"><a href="'.$server->GetWsdlUri().'&readable">'.$server->GetWsdlUri().'</a></span></p>';
+		if(!$server->ForceNotOutputPhp)
+			$res[]='<p>PHP SOAP client download URI: <span class="pre"><a href="'.$server->GetPhpUri().'">'.$server->GetPhpUri().'</a></span></p>';
+		//FIXME There may be attachments if a hooking method (PdfAttachmentHook) adds a file!
+		if(self::$HTML2PDFSettings['attachments']=='1'&&!is_null(self::$HTML2PDFLicenseKey)&&($server->ForceNotOutputWsdl||$server->ForceNotOutputPhp))
+			$res[]='<p class="print">Additional files are attached to this PDF documentation.</p>';
 		if(!is_null($server->Docs))
 			$res[]='<p>'.nl2br(htmlentities($server->Docs)).'</p>';
 		return true;
@@ -1402,7 +1490,7 @@ class PhpWsdl{
 		$res[]='<div class="noprint">';
 		$res[]='<h2>Index</h2>';
 		if($tLen>0){
-			$res[]='<p>Complex types:</p>';
+			$res[]='<p>Exported types:</p>';
 			$i=-1;
 			$res[]='<ul>';
 			while(++$i<$tLen)
@@ -1459,7 +1547,7 @@ class PhpWsdl{
 		$server=$data['server'];
 		$tLen=sizeof($server->Types);
 		if($tLen>0){
-			$res[]='<h2>Complex types</h2>';
+			$res[]='<h2>Exported types</h2>';
 			$i=-1;
 			while(++$i<$tLen)
 				$types[$i]->CreateTypeHtml(array_merge(
@@ -1709,7 +1797,7 @@ class PhpWsdl{
 				)
 			){
 				self::Debug('Login required');
-				header('WWW-Authenticate: Basic realm="SOAP webservice login required"');
+				header('WWW-Authenticate: Basic realm="Webservice login required"');
 			    header('HTTP/1.0 401 Unauthorized');
 				if($andExit){
 					self::Debug('Exit script execution');
@@ -1781,6 +1869,13 @@ class PhpWsdl{
 						throw(new Exception('Webservice handler class not present'));
 				}
 			}
+		// Prepare the PhpWsdlHandler
+		if($this->CreateHandler){
+			self::Debug('Use PhpWsdlHandler');
+			if(is_null($class))
+				$class=$this->Name;
+			$class=$this->CreateHandler($class);
+		}
 		// Prepare the SOAP server
 		$this->SoapServer=null;
 		if(self::CallHook(
@@ -1834,13 +1929,17 @@ class PhpWsdl{
 				$this->SoapServer->setObject($class);
 			}
 			// Add global methods
-			$i=-1;
-			$len=sizeof($this->Methods);
-			while(++$i<$len)
-				if($this->Methods[$i]->IsGlobal){
-					self::Debug('Adding global method '.$this->Methods[$i]->Name);
-					$this->SoapServer->addFunction($this->Methods[$i]->Name);
-				}
+			if(!$useProxy&&!$this->CreateHandler){
+				$i=-1;
+				$len=sizeof($this->Methods);
+				while(++$i<$len)
+					if($this->Methods[$i]->IsGlobal){
+						self::Debug('Adding global method '.$this->Methods[$i]->Name);
+						$this->SoapServer->addFunction($this->Methods[$i]->Name);
+					}
+			}else{
+				self::Debug('Omit adding global methods to the SoapServer object since they will be called by the proxy or the PhpWsdlHandler object');
+			}
 		}
 		// Run the SOAP server
 		if(self::CallHook(
@@ -1932,6 +2031,23 @@ class PhpWsdl{
 	}
 	
 	/**
+	 * Set a object for all methods from a class
+	 * 
+	 * @param string $class The class name
+	 * @param object $obj An instance of the class
+	 */
+	public function SetMethodObject($class,$obj){
+		$i=-1;
+		$len=sizeof($this->Methods);
+		while(++$i<$len){
+			$m=$this->Methods[$i];
+			if($m->Class!=$class)
+				continue;
+			$m->Class=$obj;
+		}
+	}
+	
+	/**
 	 * Get the cache filename
 	 * 
 	 * @param string $endpoint The endpoint URI or NULL to use the PhpWsdl->EndPoint property (default: NULL)
@@ -2012,6 +2128,7 @@ class PhpWsdl{
 			$this->WsdlUri=$data['wsdluri'];
 			$this->PhpUri=$data['phpuri'];
 			$this->DocUri=$data['docuri'];
+			$this->HandlerPhp=$data['handler'];
 			self::CallHook(
 				'ReadCacheHook',
 				Array(
@@ -2103,7 +2220,8 @@ class PhpWsdl{
 			'php'			=>	$this->PHP,
 			'wsdluri'		=>	$this->WsdlUri,
 			'phpuri'		=>	$this->PhpUri,
-			'docuri'		=>	$this->DocUri
+			'docuri'		=>	$this->DocUri,
+			'handler'		=>	($this->CreateHandler)?$this->HandlerPhp:null
 		);
 		self::CallHook(
 			'WriteCacheHook',
@@ -2260,10 +2378,74 @@ class PhpWsdl{
 	}
 	
 	/**
+	 * Create the handler object for this webservice
+	 * 
+	 * @param string|object $targetHandler The target handler class name or object or NULL
+	 * @return PhpWsdlHandler The handler object
+	 */
+	public function CreateHandler($targetHandler=null){
+		if(!is_null($this->Handler))
+			return $this->Handler;
+		self::Debug('Create the handler object');
+		if(class_exists('PhpWsdlHandler')){
+			self::Debug('PhpWsdlHandler exists');
+			$this->Handler=new PhpWsdlHandler($this,$targetHandler);
+			self::Debug('Handler object created');
+			return $this->Handler;
+		}
+		self::Debug('Create PhpWsdlHandler');
+		if(is_null($this->HandlerPhp)){
+			$php=Array();
+			$php[]='class PhpWsdlHandler{';
+			// Variables
+			$php[]='public $_Server=null;';
+			$php[]='public $_TargetHandler=null;';
+			// Constructor
+			$php[]='public function PhpWsdlHandler($server,$targetHandler){';
+			$php[]='$this->_Server=$server;';
+			$php[]='$this->_TargetHandler=$targetHandler;';
+			$php[]='}';
+			// Caller method
+			$php[]='public function _Call($method,$param){';
+			$php[]='$obj=null;';
+			$php[]='$m=$this->_Server->GetMethod($method);';
+			$php[]='if(!$m->IsGlobal) $obj=(is_null($m->Class))?$this->_TargetHandler:$m->Class;';
+			$php[]='$call=(is_null($obj))?$m->Name:Array($obj,$m->Name);';
+			$php[]='return call_user_func_array($call,$param);';
+			$php[]='}';
+			// Webservice methods
+			$i=-1;
+			$len=sizeof($this->Methods);
+			while(++$i<$len){
+				$m=$this->Methods[$i];
+				$temp=Array();
+				$j=-1;
+				$pLen=sizeof($m->Param);
+				while(++$j<$pLen)
+					$temp[]='$'.$m->Param[$j]->Name;
+				$temp=implode(',',$temp);
+				$php[]='public function '.$m->Name.'('.$temp.'){';
+				$php[]='return $this->_Call("'.$m->Name.'",Array('.$temp.'));';
+				$php[]='}';
+			}
+			$php[]='}';
+			$php=implode("\n",$php);
+			$this->HandlerPhp=$php;
+			$this->WriteWsdlToCache(null,null,null,true);
+		}else{
+			$php=$this->HandlerPhp;
+		}
+		eval($php);
+		$this->Handler=new PhpWsdlHandler($this,$targetHandler);
+		self::Debug('Handler object created');
+		return $this->Handler;
+	}
+	
+	/**
 	 * Translate a type name for WSDL
 	 * 
 	 * @param string $type The type name
-	 * @return string The translates type name
+	 * @return string The translated type name
 	 */
 	public static function TranslateType($type){
 		if(!self::CallHook(
@@ -2275,6 +2457,36 @@ class PhpWsdl{
 		)
 			return $type;
 		return ((in_array($type,self::$BasicTypes))?self::$Config['xsd']:self::$Config['tns']).':'.$type;
+	}
+	
+	/**
+	 * Translate a target type name for WSDL
+	 * 
+	 * @param string $type The type name
+	 * @return string The translated target type name
+	 */
+	public function TranslateTargetType($type){
+		if(!self::CallHook(
+				'TranslateTargetTypeHook',
+				Array(
+					'type'			=>	&$type
+				)
+			)
+		)
+			return $type;
+		if(in_array($type,self::$BasicTypes))
+			return self::TranslateType($type);
+		$t=$this->GetType($type);
+		if(is_null($t))
+			return self::TranslateType($type);
+		switch(get_class($t)){
+			case 'PhpWsdlEnum':
+				return self::TranslateType($t->Type);
+				break;
+			default:
+				return self::TranslateType($type);
+				break;
+		}
 	}
 	
 	/**
@@ -2292,8 +2504,10 @@ class PhpWsdl{
 		$i=-1;
 		$len=sizeof($keys);
 		while(++$i<$len){
-			self::Debug('Call '.self::$Config['extensions'][$name][$keys[$i]]);
-			if(!call_user_func(self::$Config['extensions'][$name][$keys[$i]],$data)){
+			$fnc=self::$Config['extensions'][$name][$keys[$i]];
+			self::Debug('Call '.$fnc);
+			if(is_string($fnc)&&strpos($fnc,'::')>-1) $fnc=explode('::',$fnc);
+			if(!call_user_func($fnc,$data)){
 				self::Debug('Handler stopped hook execution');
 				return false;
 			}
@@ -2359,6 +2573,109 @@ class PhpWsdl{
 	}
 	
 	/**
+	 * Get the encoding data for a type
+	 * 
+	 * @param string $type The type name
+	 * @param boolean $parameter Get the parameter definition? (default: FALSE)
+	 * @param boolean $defaults Fall back to defaults? (default: TRUE)
+	 * @param PhpWsdl $server The PhpWsdl object (default: NULL)
+	 * @return array The encoding data or NULL, if not found
+	 */
+	public static function GetEncoding($type,$parameter=false,$defaults=true,$server=null){
+		if($parameter){
+			if(isset(self::$TypeEncoding['parameter'][$type]))
+				return self::$TypeEncoding['parameter'][$type];
+		}else{
+			if(isset(self::$TypeEncoding['return'][$type]))
+				return self::$TypeEncoding['return'][$type];
+		}
+		if(!in_array($type,self::$BasicTypes)){
+			$t=null;
+			if(!is_null($server))
+				$t=$server->GetType($type);
+			return Array(
+					'encoding'		=>	(is_null($t)||!$t->IsArray)?SOAP_ENC_OBJECT:SOAP_ENC_ARRAY
+				);
+		}
+		if(!$defaults)
+			return null;
+		return (isset(self::$TypeEncoding['default'][$type]))
+			?self::$TypeEncoding['default'][$type]
+			:null;
+	}
+	
+	/**
+	 * Set the SOAP encoding for a type
+	 * 
+	 * @param string $type The type name
+	 * @param string|int $encoding The SOAP encoding
+	 * @param boolean $parameter Set the parameter definition? (default: FALSE)
+	 */
+	public static function SetEncoding($type,$encoding,$parameter=false){
+		self::$TypeEncoding[($parameter)?'parameter':'return'][$type]=Array(
+				'encoding'		=>	$encoding
+			);
+	}
+	
+	/**
+	 * Encode some data for SOAP
+	 * 
+	 * @param string $type The type name
+	 * @param mixed $data The data to be encoded
+	 * @param boolean $parameter Get the parameter definition? (default: FALSE)
+	 * @param PhpWsdl $server The PhpWsdl object (default: NULL)
+	 * @return mixed|SoapVar The SoapVar object
+	 */
+	public static function DoEncoding($type,$data,$parameter=false,$server=null){
+		$res=null;
+		if(!self::CallHook(
+				'EncodeHook',
+				Array(
+					'server'		=>	&$server,
+					'type'			=>	&$type,
+					'data'			=>	&$data,
+					'parameter'		=>	&$parameter,
+					'res'			=>	&$res
+				)
+			)
+		)
+			return $res;
+		if(!self::CallHook(
+				'Encode'.$type.'Hook',
+				Array(
+					'server'		=>	&$server,
+					'type'			=>	&$type,
+					'data'			=>	&$data,
+					'parameter'		=>	&$parameter,
+					'res'			=>	&$res
+				)
+			)
+		)
+			return $res;
+		$t=null;
+		if(!is_null($server)&&!in_array($type,self::$BasicTypes)){
+			$t=$server->GetType($type);
+			if(get_class($t)=='PhpWsdlEnum')
+				if(!in_array($t->Type,self::$BasicTypes)){
+					$t=$server->GetType($t->Type);
+				}else{
+					$type=$t->Type;
+					$t=null;
+				}
+		}
+		$enc=self::GetEncoding($type,$parameter,true,$server);
+		if(is_null($enc))
+			$enc=Array(
+					'encoding'		=>	(is_null($t)||!$t->IsArray)?SOAP_ENC_OBJECT:SOAP_ENC_ARRAY
+				);
+		if(!is_null($server))
+			$enc['ns']=$server->NameSpace;
+		if(isset($enc['ns']))
+			return new SoapVar($data,$enc['encoding'],$type,$enc['ns']);
+		return new SoapVar($data,$enc['encoding']);
+	}
+	
+	/**
 	 * Add a debugging message
 	 * 
 	 * @param string $str The message to add to the debug protocol
@@ -2366,6 +2683,10 @@ class PhpWsdl{
 	public static function Debug($str){
 		if(!self::$Debugging)
 			return;
+		if(!is_null(self::$DebugHandler)){
+			call_user_func(self::$DebugHandler,$str);
+			return;
+		}
 		$temp=date('Y-m-d H:i:s')."\t".$str;
 		if(self::$DebugBackTrace){
 			$trace=debug_backtrace();
@@ -2374,8 +2695,9 @@ class PhpWsdl{
 		self::$DebugInfo[]=$temp;
 		if(!is_null(self::$DebugFile))
 			if(file_put_contents(self::$DebugFile,$temp."\n",FILE_APPEND)===false){
-				self::Debug('Could not write to debug file '.self::$DebugFile);
+				$temp=self::$DebugFile;
 				self::$DebugFile=null;
+				self::Debug('Could not write to debug file "'.$temp.'"');
 			}
 	}
 
@@ -2395,12 +2717,95 @@ class PhpWsdl{
 			'wsdl'			=>	'http://schemas.xmlsoap.org/wsdl/',
 			'soapenc'		=>	'http://schemas.xmlsoap.org/soap/encoding/'
 		);
+		//TODO How to encode the missing basic types?
+		self::$TypeEncoding=Array(
+			'parameter'		=>	Array(),
+			'return'		=>	Array(),
+			'default'		=>	Array(
+				'string'		=>	Array(
+						'encoding'		=>	XSD_STRING
+					),
+				'boolean'		=>	Array(
+						'encoding'		=>	XSD_BOOLEAN
+					),
+				'decimal'		=>	Array(
+						'encoding'		=>	XSD_DECIMAL
+					),
+				'float'			=>	Array(
+						'encoding'		=>	XSD_FLOAT
+					),
+				'double'		=>	Array(
+						'encoding'		=>	XSD_DOUBLE
+					),
+				'duration'		=>	Array(
+						'encoding'		=>	XSD_DURATION
+					),
+				'dateTime'		=>	Array(
+						'encoding'		=>	XSD_DATETIME
+					),
+				'time'			=>	Array(
+						'encoding'		=>	XSD_TIME
+					),
+				'date'			=>	Array(
+						'encoding'		=>	XSD_DATE
+					),
+				'gYearMonth'	=>	Array(
+						'encoding'		=>	XSD_GYEARMONTH
+					),
+				'gYear'			=>	Array(
+						'encoding'		=>	XSD_GYEAR
+					),
+				'gMonthDay'		=>	Array(
+						'encoding'		=>	XSD_GMONTHDAY
+					),
+				'gDay'			=>	Array(
+						'encoding'		=>	XSD_GDAY
+					),
+				'gMonth'		=>	Array(
+						'encoding'		=>	XSD_GMONTH
+					),
+				'hexBinary'		=>	Array(
+						'encoding'		=>	XSD_HEXBINARY
+					),
+				'base64Binary'	=>	Array(
+						'encoding'		=>	XSD_BASE64BINARY
+					),
+				'anyURI'		=>	Array(
+						'encoding'		=>	XSD_ANYURI
+					),
+				'QName'			=>	Array(
+						'encoding'		=>	XSD_QNAME
+					),
+				'NOTATION'		=>	Array(
+						'encoding'		=>	XSD_NOTATION
+					),
+				'int'			=>	Array(
+						'encoding'		=>	XSD_INT
+					),
+				'integer'		=>	Array(
+						'encoding'		=>	XSD_INTEGER
+					),
+				'long'			=>	Array(
+						'encoding'		=>	XSD_LONG
+					),
+				'short'			=>	Array(
+						'encoding'		=>	XSD_SHORT
+					),
+				'byte'			=>	Array(
+						'encoding'		=>	XSD_BYTE
+					),
+				'anyType'		=>	Array(
+						'encoding'		=>	XSD_ANYTYPE
+					)
+			)
+		);
 		self::EnableCache();
 		self::$Config['extensions']=Array();// A configuration space for extensions
 		self::$Config['tns']='tns';			// The xmlns name for the target namespace
 		self::$Config['xsd']='s';			// The xmlns name for the XSD namespace
 		// Parser hooks
 		self::RegisterHook('InterpretKeywordserviceHook','internal','PhpWsdl::InterpretService');
+		self::RegisterHook('InterpretKeywordpw_setHook','internal','PhpWsdl::InterpretSetting');
 		// WSDL hooks
 		self::RegisterHook('CreateWsdlHeaderHook','internal','PhpWsdl::CreateWsdlHeader');
 		self::RegisterHook('CreateWsdlTypeSchemaHook','internal','PhpWsdl::CreateWsdlTypeSchema');

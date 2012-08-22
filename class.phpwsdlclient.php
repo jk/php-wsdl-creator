@@ -2,7 +2,7 @@
 
 /*
 PhpWsdl - Generate WSDL from PHP
-Copyright (C) 2011  Andreas Zimmermann, wan24.de 
+Copyright (C) 2011  Andreas Müller-Saala, wan24.de 
 
 This program is free software; you can redistribute it and/or modify it under 
 the terms of the GNU General Public License as published by the Free Software 
@@ -21,23 +21,23 @@ if(basename($_SERVER['SCRIPT_FILENAME'])==basename(__FILE__))
 	exit;
 
 // To use PhpWsdlClient, you need to load it seperatly from PhpWsdl. Or you 
-// just load this class and let it autoload PhpWsdl 
+// just load this class and let it autoload PhpWsdl
 
 require_once(dirname(__FILE__).'/class.phpwsdl.php');
 
 /**
  * A SOAP client class for PhpWsdl
  * 
- * @author Andreas Zimmermann, wan24.de
- * @version 2.2
+ * @author Andreas Müller-Saala, wan24.de
+ * @version 2.4
  */
 class PhpWsdlClient{
 	/**
-	 * The version number 
+	 * The version number
 	 * 
 	 * @var string
 	 */
-	public static $VERSION='2.2';
+	public static $VERSION='2.4';
 	/**
 	 * Parse a method
 	 * 1: Type
@@ -54,7 +54,7 @@ class PhpWsdlClient{
 	 * 
 	 * @var string
 	 */
-	public static $typeRx='/^([^\s]+)\s([^\[|\{|\s]+)[\[|\{|\s].*$/s';
+	public static $typeRx='/^([^\s]+)\s([^\[|\{|\s]+)([\[|\{|\s].*$)?/s';
 	/**
 	 * Parse an element
 	 * 1: Type
@@ -131,7 +131,7 @@ class PhpWsdlClient{
 	public $Warnings=Array();
 	/**
 	 * The http Auth username for fetching the WSDL (and sending SOAP requests, if PhpWsdlClient->UseSoapHttpAuth is TRUE)
-	 * If you need a different login for SOAP requests, use the PhpWsdlClient->ClientOptions array fro the SOAP request 
+	 * If you need a different login for SOAP requests, use the PhpWsdlClient->ClientOptions array for the SOAP request 
 	 * authentification values (login/password)
 	 * 
 	 * @var string
@@ -155,6 +155,13 @@ class PhpWsdlClient{
 	 * @var boolean
 	 */
 	public $Debugging=false;
+	/**
+	 * Encode parameters?
+	 * Note: This will only work if it's possible to build a PhpWsdl object from the target webservice WSDL
+	 * 
+	 * @var boolean
+	 */
+	public $EncodeParameters=false;
 	
 	/**
 	 * Constructor
@@ -195,7 +202,7 @@ class PhpWsdlClient{
 			// Fetch with http Auth (credits to faebu :)
 			PhpWsdl::Debug('Try CURL for http Auth');
             $ch=curl_init();
-            $credit=($this->HttpUser.':'.$this->HttpPassword);
+            $credit=$this->HttpUser.':'.$this->HttpPassword;
             curl_setopt_array($ch,array_merge(
             	Array(
             		CURLOPT_URL				=>	$wsdlUri,
@@ -208,7 +215,7 @@ class PhpWsdlClient{
             ));
             $wsdl=curl_exec($ch);
             if($wsdl===false){
-            	PhpWsdl::Debug('Could not fetch WSDL with CURL: '.curl_error($ch));
+            	PhpWsdl::Debug('WARNING: Could not fetch WSDL with CURL: '.curl_error($ch));
             	@curl_close($ch);
             }else{
 	            curl_close($ch);
@@ -233,6 +240,21 @@ class PhpWsdlClient{
 		$options=array_merge($this->Options,$options);
 		$requestHeaders=array_merge($this->RequestHeaders,$requestHeaders);
 		$client=$this->GetClient();
+		if($this->EncodeParameters){
+			$server=$this->CreateServerFromWsdl();
+			$m=$server->GetMethod($method);
+			if(!is_null($m)){
+				PhpWsdl::Debug('Encode parameters');
+				$temp=Array();
+				$i=-1;
+				$len=sizeof($param);
+				while(++$i<$len)
+					$temp[]=PhpWsdl::DoEncoding($m->Param[$i]->Type,$param[$i],true,$server);
+				$param=$temp;
+			}else{
+				PhpWsdl::Debug('Can not encode parameters because the method was not found');
+			}
+		}
 		$res=$client->__soapCall($method,$param,$options,$requestHeaders);
 		if(is_soap_fault($res))
 			PhpWsdl::Debug('SOAP error #'.$res->faultcode.': '.$res->faultstring);
@@ -378,14 +400,17 @@ class PhpWsdlClient{
 				continue;
 			}
 			$arr=strpos($t,'[]')>-1;
+			$enum=!$arr&&strpos($t,'{')<0;
 			if($arr){
 				PhpWsdl::Debug('Array type');
 				$y=new PhpWsdlComplex($name);
 				$y->Type=$type;
 				$y->IsArray=true;
 				$soap->Types[]=$y;
-			}else if($type=='struct'){
+			}else if(!$enum&&$type=='struct'){
 				PhpWsdl::Debug('Complex type');
+				// Note: Inherited types are not supported since the PHP SoapClient object doesn't provide parent class 
+				// informations of a complex type, so PhpWsdlClient doesn't support inherited complex types at all!
 				$el=Array();
 				$temp=explode("\n",$t);
 				$j=0;
@@ -400,6 +425,11 @@ class PhpWsdlClient{
 				}
 				$y=new PhpWsdlComplex($name,$el);
 				$y->IsArray=false;
+				$soap->Types[]=$y;
+			}else if($enum){
+				PhpWsdl::Debug('Enumeration');
+				PhpWsdl::Debug('WARNING: Enumeration values are unknown!');
+				$y=new PhpWsdlEnum($name,$type);
 				$soap->Types[]=$y;
 			}else{
 				$this->Warn('WARNING: Could not create type '.$t);
