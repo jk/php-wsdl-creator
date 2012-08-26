@@ -1047,8 +1047,11 @@ class PhpWsdlServers{
 							break;
 						case 'PhpWsdlEnum':
 							$res[]='	this.'.$t->Name.'={';
-							while(++$j<$eLen)
-								$res[]='		"'.$t->Elements[$j].'":"'.$t->Elements[$j].'"'.(($j<$eLen-1)?',':'');
+							while(++$j<$eLen){
+								$temp=explode('=',$t->Elements[$j],2);
+								if(sizeof($temp)==1) $temp[]=$temp[0];
+								$res[]='		"'.$temp[0].'":"'.addslashes($temp[1]).'"'.(($j<$eLen-1)?',':'');
+							}
 							$res[]='	};';
 							break;
 						default:

@@ -141,7 +141,7 @@ class PhpWsdlParam extends PhpWsdlObject{
 		$info=explode(' ',$data['keyword'][1],3);
 		if(sizeof($info)<2)
 			return true;
-		$name=substr($info[1],1);
+		$name=(substr($info[1],0,1)=='$')?substr($info[1],1):$info[1];
 		if(substr($name,strlen($name)-1,1)==';')
 			$name=substr($name,0,strlen($name)-1);
 		PhpWsdl::Debug('Interpret parameter '.$name);

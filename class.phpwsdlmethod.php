@@ -173,7 +173,7 @@ class PhpWsdlMethod extends PhpWsdlObject{
 		$res[]='</wsdl:output>';
 		$ex=$this->GetExceptionTypeName();
 		if($ex!=null){
-			$res[]='<wsdl:fault>';
+			$res[]='<wsdl:fault name="'.$this->Name.'Exception">';
 			$res[]='<soap:fault name="'.$this->Name.'Exception" use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="'.$pw->NameSpace.'" />';
 			$res[]='</wsdl:fault>';
 		}

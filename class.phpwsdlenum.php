@@ -88,8 +88,11 @@ class PhpWsdlEnum extends PhpWsdlObject{
 		$res[]='<s:restriction base="'.PhpWsdl::TranslateType($this->Type).'">';
 		$i=-1;
 		$len=sizeof($this->Elements);
-		while(++$i<$len)
-			$res[]='<s:enumeration value="'.self::EncodeXmlAttribute($this->Elements[$i]).'" />';
+		while(++$i<$len){
+			$temp=explode('=',$this->Elements[$i],2);
+			//TODO Is there really no common way to provide a label for an integer value f.e.?
+			$res[]='<s:enumeration value="'.self::EncodeXmlAttribute($temp[0]).'" />';
+		}
 		$res[]='</s:restriction>';
 		$res[]='</s:simpleType>';
 		return implode('',$res);
@@ -162,17 +165,16 @@ class PhpWsdlEnum extends PhpWsdlObject{
 		$res[]=" * @pw_enum ".$this->Type." ".$this->Name." ".implode(',',$this->Elements);
 		$res[]=" */";
 		$res[]="abstract class ".$this->Name."{";
-		$res[]="\t/**";
-		$res[]="\t * A list of enumerateable ".$this->Type." values as hash array";
-		$res[]="\t *";
-		$res[]="\t * @var array";
-		$res[]="\t */";
-		$res[]="\tpublic static \$Enum=Array(";
 		$i=-1;
 		$eLen=sizeof($this->Elements);
-		while(++$i<$eLen)
-			$res[]="\t\t'".$this->Elements[$i]."'=>'".$this->Elements[$i]."'".(($i<$eLen-1)?',':'');
-		$res[]="\t);";
+		while(++$i<$eLen){
+			$temp=explode('=',$this->Elements[$i],2);
+			if(sizeof($temp)==1) $temp[]=$temp[0];// Use the key as string value, if no value was given
+			$res[]="\t/**";
+			$res[]="\t * @var ".$this->Type;
+			$res[]="\t */";
+			$res[]="\tconst \$".$temp[0]."=\"".addslashes($temp[1])."\";";
+		}
 		$res[]="}";
 	}
 	

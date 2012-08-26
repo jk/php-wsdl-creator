@@ -56,7 +56,7 @@ class ComplexTypeDemo{
 	 * @ignore
 	 */
 	public function ComplexTypeDemo(){
-		$this->Enum=DemoEnum::$Enum['ValueB'];
+		$this->Enum=DemoEnum::ValueB;
 	}
 }
 
@@ -113,7 +113,7 @@ class ComplexTypeDemoB extends ComplexTypeDemo{
  * This is how to define an enumeration. You don't need the class DemoEnum - it's just to demonstrate how 
  * I handle enumerations in PHP.
  * 
- * @pw_enum string DemoEnum ValueA,ValueB,ValueC A sample enumeration
+ * @pw_enum string DemoEnum ValueA=ValueA,ValueB=ValueB,ValueC=ValueC A sample enumeration
  */
 abstract class DemoEnum{
 	/**
@@ -137,6 +137,8 @@ abstract class DemoEnum{
 	
 	/**
 	 * Constructor that will throw an exception because you can't instance an enumeration
+	 * 
+	 * @ignore
 	 */
 	public function DemoEnum(){
 		throw(new Exception('This is an enumeration - instances are not supported!'));
@@ -148,9 +150,9 @@ abstract class DemoEnum{
 /**
  * This is the exception type for all methods
  * 
- * @pw_element string message The message
- * @pw_element int code The code
- * @pw_element string file The file name
- * @pw_element int line The line number
+ * @pw_element string $message The message
+ * @pw_element int $code The code
+ * @pw_element string $file The file name
+ * @pw_element int $line The line number
  * @pw_complex SoapFault A complex type describing the SoapFault exception
  */

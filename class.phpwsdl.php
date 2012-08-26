@@ -470,7 +470,7 @@ class PhpWsdl{
 		}
 		// SOAP server options
 		$this->SoapServerOptions=Array(
-			'soap_version'	=>	SOAP_1_1|SOAP_1_2,
+			'soap_version'	=>	(defined('SOAP_1_2'))?SOAP_1_2:SOAP_1_1,
 			'encoding'		=>	'UTF-8',
 			'compression'	=>	SOAP_COMPRESSION_ACCEPT|SOAP_COMPRESSION_GZIP|9
 		);
@@ -750,6 +750,7 @@ class PhpWsdl{
 		$tryFiles=array_merge($this->Files,$tryFiles);
 		$i=-1;
 		$len=sizeof($tryFiles);
+		$class=null;
 		while(++$i<$len){
 			$file=$tryFiles[$i];
 			self::Debug('Try to determine the class name from '.$file);
@@ -773,7 +774,11 @@ class PhpWsdl{
 	 * Determine the endpoint URI
 	 */
 	public function DetermineEndPoint(){
-		return ((isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on')?'https':'http').'://'.$_SERVER['SERVER_NAME'].$_SERVER['SCRIPT_NAME'];
+		$ssl=isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']=='on';
+		$res='http'.(($ssl)?'s':'').'://'.$_SERVER['SERVER_NAME'];
+		if(((!$ssl&&$_SERVER['SERVER_PORT']!=80)||($ssl&&$_SERVER['SERVER_PORT']!=443)))
+			$res.=':'.$_SERVER['SERVER_PORT'];// Append the non-default server port
+		return $res.$_SERVER['SCRIPT_NAME'];
 	}
 
 	/**
